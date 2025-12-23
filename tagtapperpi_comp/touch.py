@@ -13,8 +13,9 @@ except Exception:
 def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: float = 0.3):
     """Start a background thread that reads raw kernel input from `device_path`.
 
-    When data is read the function will call `app.call_from_thread(app.action_trigger_touch)`
-    so the Textual app can react on the main thread.
+    When data is read the function will post a Click event targeted at the
+    `#toggle` widget in the Textual app. It does not directly change app
+    state; only a received Click on the button will cause the UI to toggle.
     """
 
     def _monitor():
@@ -28,18 +29,12 @@ def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: fl
                 while True:
                     data = f.read(poll_size)
                     if data:
-                        # First: notify app via existing action (guaranteed fallback)
-                        try:
-                            app.call_from_thread(app.action_trigger_touch)
-                        except Exception:
-                            # app might be shutting down
-                            break
-
-                        # Then: attempt to post a Click event targeted at the label widget.
+                        # Post a Click event to the button in the UI thread.
                         try:
                             app.call_from_thread(post_click, app)
                         except Exception:
-                            pass
+                            # app might be shutting down
+                            break
 
                         # simple debouncing: wait and clear input buffer
                         time.sleep(debounce)
@@ -62,27 +57,28 @@ def post_click(target_app) -> None:
     to remain compatible across Textual versions. It logs successes/failures.
     """
     try:
-        label = None
+        # target the toggle button
+        widget = None
         try:
-            label = target_app.query_one("#label")
+            widget = target_app.query_one("#toggle")
         except Exception:
             pass
 
-        if Click is None or label is None:
-            logging.debug("Click event not available or label not found")
+        if Click is None or widget is None:
+            logging.debug("Click event not available or toggle button not found")
             return
 
         # Try several constructors to be compatible with Textual versions
         created = False
         for ctor_args in (
-            (label,),
+            (widget,),
             (),
         ):
             try:
                 if ctor_args:
                     ev = Click(*ctor_args)
                 else:
-                    ev = Click(sender=label, x=0, y=0, button=1)
+                    ev = Click(sender=widget, x=0, y=0, button=1)
                 target_app.post_message(ev)
                 logging.info("Posted Click event to app")
                 created = True
@@ -93,8 +89,8 @@ def post_click(target_app) -> None:
         if not created:
             # Last resort: try to attach sender then post
             try:
-                ev = Click(label)
-                ev.sender = label
+                ev = Click(widget)
+                ev.sender = widget
                 target_app.post_message(ev)
                 logging.info("Posted Click event (fallback) to app")
             except Exception as e:
