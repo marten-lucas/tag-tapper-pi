@@ -17,6 +17,10 @@ echo "Ensuring log file exists and is owned by 'dietpi'..."
 sudo touch "$LOG_FILE" || true
 sudo chown dietpi:dietpi "$LOG_FILE" || true
 
+echo "Ensuring error log file exists and is owned by 'dietpi'..."
+sudo touch "$ERR_LOG" || true
+sudo chown dietpi:dietpi "$ERR_LOG" || true
+
 echo "Restarting service $SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
 
