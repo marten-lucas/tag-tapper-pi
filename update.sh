@@ -12,6 +12,7 @@ git pull
 
 echo "Updating service unit..."
 sudo cp ${SERVICE_NAME} /etc/systemd/system/${SERVICE_NAME}
+sudo chmod +x start.sh
 sudo systemctl daemon-reload
 
 echo "Ensuring log file exists and is owned by 'dietpi'..."

@@ -1,7 +1,7 @@
 import yaml
 from pathlib import Path
 
-CONFIG_PATH = Path("config.yaml")
+CONFIG_PATH = Path(__file__).parent.parent / "config.yaml"
 
 def load_config() -> dict:
     if not CONFIG_PATH.exists():

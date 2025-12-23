@@ -5,18 +5,17 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/env bash /home/dietpi/tag-tapper-pi/start.sh
+ExecStart=/home/dietpi/tag-tapper-pi/start.sh
 WorkingDirectory=/home/dietpi/tag-tapper-pi
 User=root
 Group=root
 
 StandardInput=tty
 StandardOutput=tty
+StandardError=append:/home/dietpi/tag-tapper-pi/tag-tapper-pi.log
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
-
-StandardError=append:/home/dietpi/tag-tapper-pi/tag-tapper-pi.log
 
 Restart=always
 RestartSec=5

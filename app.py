@@ -8,7 +8,7 @@ from textual.events import Click
 from tagtapperpi_comp import touch as touch_mod
 
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
-LOG_PATH = "/home/dietpi/tag-tapper-pi/tag-tapper-pi.log"
+LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tag-tapper-pi.log")
 
 logging.basicConfig(
     filename=LOG_PATH,
@@ -17,9 +17,7 @@ logging.basicConfig(
 )
 
 # Ensure Textual logs propagate to the same file
-textual_logger = logging.getLogger("textual")
-textual_logger.setLevel(logging.INFO)
-textual_logger.propagate = True
+logging.getLogger("textual").setLevel(logging.INFO)
 
 class TagTapperApp(App):
     """Einfache TUI mit Touch-Button."""
