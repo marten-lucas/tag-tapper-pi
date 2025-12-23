@@ -1,25 +1,29 @@
 [Unit]
 Description=Tag Tapper Network Dashboard
-After=network-online.target
-Wants=network-online.target
+After=network.target multi-user.target gpm.service
+Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
 User=root
+Group=root
 WorkingDirectory=/home/dietpi/tag-tapper-pi
 Environment="TERM=linux"
 Environment="COLORTERM=truecolor"
 Environment="TEXTUAL_DRIVER=linux"
 Environment="TEXTUAL_COLOR_SYSTEM=truecolor"
-ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/app.py
+# If you want to force a specific touch device path, set TEXTUAL_EVDEV_PATH here or in the environment
+# Environment="TEXTUAL_EVDEV_PATH=/dev/input/by-path/platform-3f204000.spi-cs-1-event"
+ExecStart=/home/dietpi/tag-tapper-pi/start.sh
+
 StandardInput=tty
-StandardOutput=journal
-StandardError=journal
+StandardOutput=tty
+StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
-TTYVTDisallocate=yes
-Restart=on-failure
+
+Restart=always
 RestartSec=5
 
 [Install]
