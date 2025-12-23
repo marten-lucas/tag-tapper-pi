@@ -12,12 +12,22 @@ from tagtapperpi_comp import touch as touch_mod
 # Hardware-Pfad (Bleibt gleich, da Kernel-Ebene)
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
 
-# Logging: Jetzt im korrekten Projektordner
-logging.basicConfig(
-    filename='/home/dietpi/tag-tapper-pi/app.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s'
-)
+# Logging: try file in project folder, fallback to console on permission errors
+LOG_PATH = '/home/dietpi/tag-tapper-pi/tag-tapper-pi.log'
+try:
+    logging.basicConfig(
+        filename=LOG_PATH,
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s'
+    )
+except PermissionError:
+    # Can't write to log file (likely wrong owner/permissions) — log to stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+    logging.warning(f"Cannot write to {LOG_PATH}; logging to stdout instead.")
 
 class TagTapperApp(App):
     """
