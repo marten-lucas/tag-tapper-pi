@@ -3,8 +3,8 @@ import sys
 import atexit
 import os
 
-from netdiag_components.ui import NetDiagApp
-from netdiag_components.config import load_config
+from tagtapperpi_comp.ui import NetDiagApp
+from tagtapperpi_comp.config import load_config
 
 # ---------- Logging ----------
 logging.basicConfig(
