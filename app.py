@@ -10,14 +10,17 @@ from tagtapperpi_comp import touch as touch_mod
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tag-tapper-pi.log")
 
+# Configure logging to file only - prevent any console output
 logging.basicConfig(
     filename=LOG_PATH,
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# Ensure Textual logs propagate to the same file
-logging.getLogger("textual").setLevel(logging.INFO)
+# Prevent Textual's internal logging from going to console
+logging.getLogger("textual").setLevel(logging.WARNING)
+logging.getLogger("textual").handlers = []
+logging.getLogger("textual").addHandler(logging.FileHandler(LOG_PATH))
 
 class TagTapperApp(App):
     """Einfache TUI mit Touch-Button."""

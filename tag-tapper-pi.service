@@ -12,7 +12,7 @@ Group=root
 
 StandardInput=tty
 StandardOutput=tty
-StandardError=append:/home/dietpi/tag-tapper-pi/tag-tapper-pi.log
+StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
