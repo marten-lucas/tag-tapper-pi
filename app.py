@@ -4,6 +4,10 @@ from textual.app import App, ComposeResult
 from textual.widgets import Static
 from textual.containers import Container
 from textual.reactive import reactive
+from textual.events import Click
+
+# touch monitor module
+from tagtapperpi_comp import touch as touch_mod
 
 # Hardware-Pfad (Bleibt gleich, da Kernel-Ebene)
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
@@ -60,36 +64,24 @@ class TagTapperApp(App):
         logging.info("Hardware-Touch erkannt -> Toggle State")
         self.touched = not self.touched
 
+    def on_click(self, event: Click) -> None:
+        """Handle UI clicks on widgets (e.g. for testing without hardware).
+
+        If the `label` widget is clicked, toggle the touched state.
+        """
+        try:
+            if getattr(event.sender, "id", None) == "label":
+                logging.info("UI-Click erkannt -> Toggle State")
+                self.touched = not self.touched
+        except Exception:
+            pass
+
     def on_mount(self) -> None:
         logging.info("App gestartet. Initialisiere Touch-Monitor...")
-        # Startet den Background-Worker für die Hardware-Events
-        self.run_worker(self.touch_monitor, thread=True)
+        # Start the external touch monitor (reads kernel device in background)
+        touch_mod.start_touch_monitor(self, TOUCH_PATH)
 
-    async def touch_monitor(self):
-        """Liest Rohdaten direkt aus dem Kernel-Device."""
-        try:
-            # Prüfen ob Device existiert
-            if not os.path.exists(TOUCH_PATH):
-                logging.error(f"Device nicht gefunden: {TOUCH_PATH}")
-                return
-
-            with open(TOUCH_PATH, 'rb') as f:
-                logging.info(f"Touch-Monitor verbunden mit {TOUCH_PATH}")
-                while True:
-                    data = f.read(24) # Standard evdev event Größe
-                    if data:
-                        # Event an UI-Thread senden
-                        self.call_from_thread(self.action_trigger_touch)
-                        
-                        # Entprellen: Kurz warten und restliche Daten im Puffer verwerfen
-                        import time
-                        time.sleep(0.3)
-                        try:
-                            os.read(f.fileno(), 1024)
-                        except BlockingIOError:
-                            pass
-        except Exception as e:
-            logging.error(f"Kritischer Fehler im Monitor: {e}")
+    # Touch monitoring is handled by tagtapperpi_comp.touch.start_touch_monitor
 
 if __name__ == "__main__":
     try:
