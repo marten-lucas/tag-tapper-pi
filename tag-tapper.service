@@ -1,0 +1,26 @@
+[Unit]
+Description=Tag Tapper Network Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/dietpi/tag-tapper-pi
+Environment="TERM=linux"
+Environment="COLORTERM=truecolor"
+Environment="TEXTUAL_DRIVER=linux"
+Environment="TEXTUAL_COLOR_SYSTEM=truecolor"
+ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/app.py
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

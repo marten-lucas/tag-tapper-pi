@@ -1,13 +1,12 @@
-/* Tokyo Night dark theme */
+/* Simple dark theme for framebuffer/LCD */
 Screen {
-    background: #1a1b26;
-    color: #c0caf5;
+    background: #000000;
+    color: #ffffff;
 }
 
 Header, Footer {
-    background: #16161e;
-    color: #7aa2f7;
-}
+    background: #1a1a1a;
+    color: #00aaff;
 
 /* Tabs area fills remaining height */
 TabbedContent#tabs {
@@ -18,15 +17,15 @@ TabbedContent#tabs {
 TabbedContent Tab {
     height: 3;
     padding: 0 2;
-    background: #1f2335;
-    color: #c0caf5;
-    border: tall #2a2e42;
+    background: #1a1a1a;
+    color: #aaaaaa;
+    border: tall #333333;
 }
 
 TabbedContent Tab.-active {
-    background: #2a2e42;
-    color: #e0e9ff;
-    border: tall #7aa2f7;
+    background: #0066cc;
+    color: #ffffff;
+    border: tall #00aaff;
 }
 
 /* Content padding inside each tab */
@@ -48,14 +47,14 @@ TabPane {
 
 /* Flat, web-like buttons */
 Button.flat {
-    background: transparent;
-    color: #c0caf5;
+    background: #1a1a1a;
+    color: #ffffff;
     padding: 0 4;
     margin: 0 0 1 0;
 }
 
 Button.flat:hover {
-    background: rgba(122,162,247,0.10);
+    background: #0066cc;
 }
 
 /* Large and full-width helpers */
@@ -69,11 +68,13 @@ Button.full {
 
 /* Danger variant for flat buttons (text color + subtle hover fill) */
 Button.danger.flat, Button.flat.danger {
-    color: #ff7b90;
+    color: #ff3333;
+    background: #1a1a1a;
 }
 
 Button.danger.flat:hover, Button.flat.danger:hover {
-    background: rgba(247,118,142,0.12);
+    background: #cc0000;
+    color: #ffffff;
 }
 
 /* Bottom navigation bar */
@@ -81,19 +82,19 @@ Button.danger.flat:hover, Button.flat.danger:hover {
     dock: bottom;
     height: 4;
     padding: 0 1;
-    background: #0f1324;
-    border: tall #2a2e42;
+    background: #000000;
+    border: tall #333333;
     align-horizontal: right;
     padding-right: 1;
 }
 
 Button.nav {
-    background: #7dcfff;
-    color: #0b1021;
-    border: tall #7dcfff;
+    background: #00aaff;
+    color: #000000;
+    border: tall #00aaff;
 }
 
 Button.nav:hover {
-    background: #9ad7ff;
-    border: tall #9ad7ff;
+    background: #0088cc;
+    border: tall #0088cc;
 }
