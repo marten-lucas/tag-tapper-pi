@@ -19,6 +19,16 @@ logging.basicConfig(
     format='%(asctime)s - %(message)s'
 )
 
+# Also capture Textual internal errors (stylesheet/parser) to the error log
+try:
+    textual_logger = logging.getLogger('textual')
+    eh = logging.FileHandler('/home/dietpi/tag-tapper-pi/error.log')
+    eh.setLevel(logging.ERROR)
+    eh.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    textual_logger.addHandler(eh)
+except Exception:
+    pass
+
 class TagTapperApp(App):
     """
     Haupt-App für den Trunk Tagger.
@@ -51,7 +61,9 @@ class TagTapperApp(App):
         border-radius: 6px;
     }
 
-    #center_btn:pressed {
+    /* Use focus/hover instead of unsupported :pressed pseudo-class */
+    #center_btn:focus,
+    #center_btn:hover {
         background: #002244;
         border-color: #FFFF00;
     }

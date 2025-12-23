@@ -16,6 +16,9 @@ TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
 
+# Send stderr to a persistent file while keeping the UI on tty1 (stdout still on TTY)
+StandardError=append:/home/dietpi/tag-tapper-pi/error.log
+
 Restart=always
 RestartSec=5
 
