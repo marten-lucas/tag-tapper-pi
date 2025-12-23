@@ -52,7 +52,14 @@ class NetDiagApp(App):
         if event.button.id in ("prev", "next"):
             tabs = self.query_one(TabbedContent)
             delta = -1 if event.button.id == "prev" else 1
-            tabs.active = (tabs.active + delta) % len(tabs.tabs)
+            
+            # Finde Index der aktuell aktiven Tab
+            tab_ids = [tab.id for tab in tabs.query(TabPane)]
+            current_index = tab_ids.index(tabs.active) if tabs.active in tab_ids else 0
+            
+            # Berechne neuen Index (mit Wrap-around)
+            new_index = (current_index + delta) % len(tab_ids)
+            tabs.active = tab_ids[new_index]
 
         # System-Buttons – Logik folgt später
         if event.button.id == "reboot":
