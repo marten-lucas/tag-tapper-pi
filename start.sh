@@ -1,16 +1,16 @@
 #!/bin/bash
-# Start-Skript für Tag Tapper auf dem Raspberry Pi LCD-Display
+# Start-Skript (foreground) für Tag Tapper auf dem Raspberry Pi LCD-Display
 
-# Setze Terminal-Typ für beste Kompatibilität mit Framebuffer
+cd /home/dietpi/tag-tapper-pi || exit 1
+
+# Terminal + Textual settings for framebuffer LCD
 export TERM=linux
 export COLORTERM=truecolor
-
-# Textual-spezifische Einstellungen für Framebuffer
 export TEXTUAL_DRIVER=linux
 export TEXTUAL_COLOR_SYSTEM=truecolor
 
-# Wechsle ins App-Verzeichnis
-cd "$(dirname "$0")"
+ERROR_LOG=/home/dietpi/error.log
+mkdir -p "$(dirname "$ERROR_LOG")"
 
-# Starte die App
-sudo -E python3 app.py
+# Starte die App und ersetze die Shell (sichtbar auf TTY)
+exec sudo -E /usr/bin/python3 /home/dietpi/tag-tapper-pi/app.py >> "$ERROR_LOG" 2>&1
