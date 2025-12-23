@@ -47,6 +47,13 @@ def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: fl
 
             with open(device_path, "rb") as f:
                 logging.info(f"Touch-Monitor verbunden mit {device_path}")
+                # Track latest raw and mapped coords and touch state
+                last_raw_x = None
+                last_raw_y = None
+                last_mapped_x = None
+                last_mapped_y = None
+                btn_pressed = False
+
                 while True:
                     data = f.read(poll_size)
                     if data:
@@ -76,11 +83,38 @@ def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: fl
                                 sec, usec, etype, code, value = struct.unpack("llHHi", data[:24])
                                 # EV_ABS == 3, codes: 0 = ABS_X, 1 = ABS_Y
                                 if etype == 3 and code in (0, 1):
-                                    axis = "X" if code == 0 else "Y"
-                                    logger.info(f"Touch position {axis}={value}")
+                                    # raw value
+                                    if code == 0:
+                                        last_raw_x = int(value)
+                                    else:
+                                        last_raw_y = int(value)
+
+                                    # map raw (0-4095) to display (480x320)
+                                    try:
+                                        RAW_MAX = 4095
+                                        if last_raw_x is not None:
+                                            mx = int(max(0, min(RAW_MAX, last_raw_x)) / RAW_MAX * (480 - 1))
+                                            last_mapped_x = mx
+                                        if last_raw_y is not None:
+                                            my = int(max(0, min(RAW_MAX, last_raw_y)) / RAW_MAX * (320 - 1))
+                                            last_mapped_y = my
+                                        logger.info(f"Raw touch X={last_raw_x} Y={last_raw_y} -> Mapped X={last_mapped_x} Y={last_mapped_y}")
+                                    except Exception:
+                                        logger.debug("Mapping error")
+
                                 # BTN_TOUCH often appears as type 1, code 330
                                 elif etype == 1 and code in (330,):
+                                    # value 1 = press, 0 = release
+                                    btn_pressed = bool(value)
                                     logger.info(f"BTN_TOUCH code={code} value={value}")
+                                    # On press, post Click with mapped coords if available
+                                    if btn_pressed and last_mapped_x is not None and last_mapped_y is not None:
+                                        try:
+                                            # Post a Click event with mapped coordinates
+                                            app.call_from_thread(post_click, app, last_mapped_x, last_mapped_y)
+                                            logger.info(f"Posted Click at mapped X={last_mapped_x} Y={last_mapped_y}")
+                                        except Exception:
+                                            logger.debug("Failed to post mapped Click")
                                 else:
                                     logger.debug(f"input_event type={etype} code={code} value={value}")
                             else:
@@ -95,49 +129,52 @@ def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: fl
     return thread
 
 
-def post_click(target_app) -> None:
+def post_click(target_app, x: Optional[int] = None, y: Optional[int] = None) -> None:
     """Try to post a `Click` event to `target_app`'s `#label` widget.
 
     This function attempts multiple constructor patterns for `textual.events.Click`
     to remain compatible across Textual versions. It logs successes/failures.
     """
-    try:
-        label = None
         try:
-            label = target_app.query_one("#label")
-        except Exception:
-            pass
+            # target the center button if present
+            widget = None
+            try:
+                widget = target_app.query_one("#center_btn")
+            except Exception:
+                try:
+                    widget = target_app.query_one("#label")
+                except Exception:
+                    widget = None
 
-        if Click is None or label is None:
-            logging.debug("Click event not available or label not found")
+        except Exception:
+            widget = None
+
+        if Click is None or widget is None:
+            logging.debug("Click event not available or target widget not found")
             return
 
-        # Try several constructors to be compatible with Textual versions
+        # Try to construct Click with coordinates when provided
         created = False
-        for ctor_args in (
-            (label,),
-            (),
-        ):
+        for ctor_try in range(3):
             try:
-                if ctor_args:
-                    ev = Click(*ctor_args)
+                if x is not None and y is not None:
+                    try:
+                        ev = Click(sender=widget, x=int(x), y=int(y), button=1)
+                    except Exception:
+                        ev = Click(widget)
+                        ev.x = int(x)
+                        ev.y = int(y)
                 else:
-                    ev = Click(sender=label, x=0, y=0, button=1)
+                    ev = Click(widget)
+
                 target_app.post_message(ev)
-                logging.info("Posted Click event to app")
+                logging.info(f"Posted Click event to app (x={x} y={y})")
                 created = True
                 break
             except Exception:
                 continue
 
         if not created:
-            # Last resort: try to attach sender then post
-            try:
-                ev = Click(label)
-                ev.sender = label
-                target_app.post_message(ev)
-                logging.info("Posted Click event (fallback) to app")
-            except Exception as e:
-                logging.debug(f"Could not create Click event: {e}")
+            logging.debug("Could not create/post Click event after retries")
     except Exception as e:
         logging.debug(f"Error while posting Click: {e}")

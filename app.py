@@ -35,15 +35,25 @@ class TagTapperApp(App):
         content-align: center middle;
         text-style: bold;
     }
-
     #center_btn {
-        width: 60%;
-        height: 40%;
+        width: 288px;
+        height: 128px;
+        min-width: 288px;
+        min-height: 128px;
+        max-width: 288px;
+        max-height: 128px;
         content-align: center middle;
         text-style: bold;
-        padding: 1 2;
-        background: transparent;
-        border: none;
+        padding: 0 1;
+        background: #003366;
+        color: #ffffff;
+        border: solid 3px #00FF00;
+        border-radius: 6px;
+    }
+
+    #center_btn:pressed {
+        background: #002244;
+        border-color: #FFFF00;
     }
     """
 
