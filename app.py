@@ -1,10 +1,9 @@
 import logging
 import os
 from textual.app import App, ComposeResult
-from textual.widgets import Button
+from textual.widgets import Static
 from textual.containers import Container
 from textual.reactive import reactive
-from textual.events import Click
 from tagtapperpi_comp import touch as touch_mod
 
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
@@ -24,40 +23,46 @@ logging.getLogger("textual").addHandler(logging.FileHandler(LOG_PATH))
 
 class TagTapperApp(App):
     """Einfache TUI mit Touch-Button."""
-    CSS_PATH = os.path.join(os.path.dirname(__file__), "tagtapperpi_comp", "styles.tcss")
     touched = reactive(False)
+
+    CSS = """
+    #main {
+        align: center middle;
+        width: 100%;
+        height: 100%;
+    }
+    
+    #label {
+        width: 30;
+        height: 9;
+        content-align: center middle;
+        text-align: center;
+        text-style: bold;
+        padding: 1 2;
+    }
+    """
 
     def compose(self) -> ComposeResult:
         with Container(id="main"):
-            yield Button("TAG TAPPER PI\n\n[ BEREIT ]", id="center_btn")
+            yield Static("Touch me", id="label")
 
     def watch_touched(self, value: bool) -> None:
         """Triggered automatisch bei Änderung von self.touched."""
-        try:
-            btn = self.query_one("#center_btn")
-            if value:
-                btn.update("TAG TAPPER PI\n\n[ BERÜHRT ]")
-            else:
-                btn.update("TAG TAPPER PI\n\n[ BEREIT ]")
-        except Exception:
-            pass
+        label = self.query_one("#label")
+        
+        if value:
+            label.styles.background = "#004400"
+            label.styles.border = ("double", "#FFFF00")
+            label.update("Touched!")
+        else:
+            label.styles.background = "#003366"
+            label.styles.border = ("round", "#00FF00")
+            label.update("Touch me")
 
     def action_trigger_touch(self):
         """Wird vom touch_monitor Thread aufgerufen."""
         logging.info("Hardware-Touch erkannt -> Toggle State")
         self.touched = not self.touched
-
-    def on_click(self, event: Click) -> None:
-        """Handle UI clicks on widgets (e.g. for testing without hardware).
-
-        If the `label` widget is clicked, toggle the touched state.
-        """
-        try:
-            if getattr(event.sender, "id", None) == "center_btn":
-                logging.info("UI-Click erkannt -> Toggle State")
-                self.touched = not self.touched
-        except Exception:
-            pass
 
     def on_mount(self) -> None:
         logging.info("App gestartet. Initialisiere Touch-Monitor...")
