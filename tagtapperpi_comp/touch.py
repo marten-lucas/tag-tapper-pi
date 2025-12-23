@@ -13,9 +13,8 @@ except Exception:
 def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: float = 0.3):
     """Start a background thread that reads raw kernel input from `device_path`.
 
-    When data is read the function will post a Click event targeted at the
-    `#toggle` widget in the Textual app. It does not directly change app
-    state; only a received Click on the button will cause the UI to toggle.
+    When data is read the function will call `app.call_from_thread(app.action_trigger_touch)`
+    so the Textual app can react on the main thread.
     """
 
     def _monitor():
@@ -29,27 +28,18 @@ def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: fl
                 while True:
                     data = f.read(poll_size)
                     if data:
-                        # Log raw kernel data for inspection
+                        # First: notify app via existing action (guaranteed fallback)
                         try:
-                            # limit logged size to avoid huge outputs
-                            preview = data[:256]
-                            logging.info(
-                                "Kernel touch data: %d bytes, repr=%s, hex=%s",
-                                len(data),
-                                repr(preview),
-                                preview.hex()
-                            )
-                        except Exception as e:
-                            logging.debug(f"Could not log raw data: {e}")
-
-                        # Post a Click event to the button in the UI thread.
-                        try:
-                            logging.info("Scheduling post_click to app")
-                            app.call_from_thread(post_click, app)
-                        except Exception as e:
-                            logging.error(f"Failed to schedule post_click: {e}")
+                            app.call_from_thread(app.action_trigger_touch)
+                        except Exception:
                             # app might be shutting down
                             break
+
+                        # Then: attempt to post a Click event targeted at the label widget.
+                        try:
+                            app.call_from_thread(post_click, app)
+                        except Exception:
+                            pass
 
                         # simple debouncing: wait and clear input buffer
                         time.sleep(debounce)
@@ -72,49 +62,42 @@ def post_click(target_app) -> None:
     to remain compatible across Textual versions. It logs successes/failures.
     """
     try:
-        # target the toggle button
-        widget = None
+        label = None
         try:
-            widget = target_app.query_one("#toggle")
+            label = target_app.query_one("#label")
         except Exception:
             pass
 
-        if Click is None or widget is None:
-            logging.debug("Click event not available or toggle button not found")
+        if Click is None or label is None:
+            logging.debug("Click event not available or label not found")
             return
 
         # Try several constructors to be compatible with Textual versions
         created = False
         for ctor_args in (
-            (widget,),
+            (label,),
             (),
         ):
             try:
-                logging.debug("Trying Click constructor with args=%s", ctor_args)
                 if ctor_args:
                     ev = Click(*ctor_args)
                 else:
-                    ev = Click(sender=widget, x=0, y=0, button=1)
-                logging.debug("Posting event %s (sender id=%s)", type(ev), getattr(ev, 'sender', None))
+                    ev = Click(sender=label, x=0, y=0, button=1)
                 target_app.post_message(ev)
                 logging.info("Posted Click event to app")
                 created = True
                 break
-            except Exception as e:
-                logging.debug(f"Click constructor attempt failed: {e}")
+            except Exception:
                 continue
 
         if not created:
             # Last resort: try to attach sender then post
             try:
-                logging.debug("Trying fallback Click(widget) constructor")
-                ev = Click(widget)
-                ev.sender = widget
-                logging.debug("Posting fallback event %s (sender id=%s)", type(ev), getattr(ev, 'sender', None))
+                ev = Click(label)
+                ev.sender = label
                 target_app.post_message(ev)
                 logging.info("Posted Click event (fallback) to app")
             except Exception as e:
                 logging.debug(f"Could not create Click event: {e}")
     except Exception as e:
         logging.debug(f"Error while posting Click: {e}")
-

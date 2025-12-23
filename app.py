@@ -1,7 +1,7 @@
 import logging
 import os
 from textual.app import App, ComposeResult
-from textual.widgets import Button
+from textual.widgets import Static
 from textual.containers import Container
 from textual.reactive import reactive
 from textual.events import Click
@@ -12,22 +12,12 @@ from tagtapperpi_comp import touch as touch_mod
 # Hardware-Pfad (Bleibt gleich, da Kernel-Ebene)
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
 
-# Logging: try file in project folder, fallback to console on permission errors
-LOG_PATH = '/home/dietpi/tag-tapper-pi/tag-tapper-pi.log'
-try:
-    logging.basicConfig(
-        filename=LOG_PATH,
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s'
-    )
-except PermissionError:
-    # Can't write to log file (likely wrong owner/permissions) — log to stdout
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(message)s',
-        handlers=[logging.StreamHandler()]
-    )
-    logging.warning(f"Cannot write to {LOG_PATH}; logging to stdout instead.")
+# Logging: Jetzt im korrekten Projektordner
+logging.basicConfig(
+    filename='/home/dietpi/tag-tapper-pi/app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s'
+)
 
 class TagTapperApp(App):
     """
@@ -49,33 +39,30 @@ class TagTapperApp(App):
 
     def compose(self) -> ComposeResult:
         with Container(id="main"):
-            yield Button("TAG TAPPER PI\n\n[ BEREIT ]", id="toggle")
+            yield Static("TAG TAPPER PI\n\n[ BEREIT ]", id="label")
 
     def watch_touched(self, value: bool) -> None:
         """Triggered automatisch bei Änderung von self.touched."""
         try:
             main = self.query_one("#main")
-            btn = self.query_one("#toggle")
-
+            label = self.query_one("#label")
+            
             if value:
                 main.styles.background = "#004400"
                 main.styles.border = ("double", "#FFFF00")
-                btn.update("TAG TAPPER PI\n\n[ BERÜHRT ]")
+                label.update("TAG TAPPER PI\n\n[ BERÜHRT ]")
             else:
                 main.styles.background = "#000000"
                 main.styles.border = ("round", "#00FF00")
-                btn.update("TAG TAPPER PI\n\n[ BEREIT ]")
+                label.update("TAG TAPPER PI\n\n[ BEREIT ]")
         except Exception:
+            # Falls die Widgets beim ersten Boot noch nicht bereit sind
             pass
 
     def action_trigger_touch(self):
         """Wird vom touch_monitor Thread aufgerufen."""
-        # Instead of toggling directly, post a Click targeted at the button.
-        logging.info("Hardware-Touch erkannt -> posting Click to button")
-        try:
-            touch_mod.post_click(self)
-        except Exception:
-            pass
+        logging.info("Hardware-Touch erkannt -> Toggle State")
+        self.touched = not self.touched
 
     def on_click(self, event: Click) -> None:
         """Handle UI clicks on widgets (e.g. for testing without hardware).
@@ -83,7 +70,7 @@ class TagTapperApp(App):
         If the `label` widget is clicked, toggle the touched state.
         """
         try:
-            if getattr(event.sender, "id", None) == "toggle":
+            if getattr(event.sender, "id", None) == "label":
                 logging.info("UI-Click erkannt -> Toggle State")
                 self.touched = not self.touched
         except Exception:
