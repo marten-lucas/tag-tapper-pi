@@ -1,0 +1,56 @@
+╭──────────────────────────────────────────────────────────────────────────────────────────────────── Traceback (most recent call last) ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ /usr/local/lib/python3.13/dist-packages/textual/app.py:3249 in app_prelude                                                                                                                                                                 │
+│                                                                                                                                                                                                                                            │
+│   3246 │   │   │                                                                                ╭────────────────────────────────────────────────────────── locals ───────────────────────────────────────────────────────────╮            │
+│   3247 │   │   │   try:                                                                         │ error = StylesheetError("unable to read CSS file '/home/dietpi/netdiag/netdiag_components/netdiag_components/styles.tcss'") │            │
+│   3248 │   │   │   │   if self.css_path:                                                        │  self = NetDiagApp(title='NetDiagApp', classes={'-dark-mode'}, pseudo_classes={'focus', 'dark'})                            │            │
+│ ❱ 3249 │   │   │   │   │   self.stylesheet.read_all(self.css_path)                              ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯            │
+│   3250 │   │   │   │   for read_from, css, tie_breaker, scope in self._get_default_css():                                                                                                                                                  │
+│   3251 │   │   │   │   │   self.stylesheet.add_source(                                                                                                                                                                                     │
+│   3252 │   │   │   │   │   │   css,                                                                                                                                                                                                        │
+│                                                                                                                                                                                                                                            │
+│ /usr/local/lib/python3.13/dist-packages/textual/css/stylesheet.py:319 in read_all                                                                                                                                                          │
+│                                                                                                                                                                                                                                            │
+│   316 │   │   │   StylesheetParseError: If the CSS is invalid.                                 ╭─────────────────────────────────────────── locals ────────────────────────────────────────────╮                                           │
+│   317 │   │   """                                                                              │  path = PosixPath('/home/dietpi/netdiag/netdiag_components/netdiag_components/styles.tcss')   │                                           │
+│   318 │   │   for path in paths:                                                               │ paths = [PosixPath('/home/dietpi/netdiag/netdiag_components/netdiag_components/styles.tcss')] │                                           │
+│ ❱ 319 │   │   │   self.read(path)                                                              │  self = <Stylesheet []>                                                                       │                                           │
+│   320 │                                                                                        ╰───────────────────────────────────────────────────────────────────────────────────────────────╯                                           │
+│   321 │   def has_source(self, path: str, class_var: str = "") -> bool:                                                                                                                                                                    │
+│   322 │   │   """Check if the stylesheet has this CSS source already.                                                                                                                                                                      │
+│                                                                                                                                                                                                                                            │
+│ /usr/local/lib/python3.13/dist-packages/textual/css/stylesheet.py:304 in read                                                                                                                                                              │
+│                                                                                                                                                                                                                                            │
+│   301 │   │   │   │   css = css_file.read()                                                    ╭────────────────────────────────────── locals ───────────────────────────────────────╮                                                     │
+│   302 │   │   │   path = os.path.abspath(filename)                                             │ filename = '/home/dietpi/netdiag/netdiag_components/netdiag_components/styles.tcss' │                                                     │
+│   303 │   │   except Exception:                                                                │     self = <Stylesheet []>                                                          │                                                     │
+│ ❱ 304 │   │   │   raise StylesheetError(f"unable to read CSS file {filename!r}") from None     ╰─────────────────────────────────────────────────────────────────────────────────────╯                                                     │
+│   305 │   │   self.source[(str(path), "")] = CssSource(css, False, 0)                                                                                                                                                                      │
+│   306 │   │   self._require_parse = True                                                                                                                                                                                                   │
+│   307                                                                                                                                                                                                                                      │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+StylesheetError: unable to read CSS file '/home/dietpi/netdiag/netdiag_components/netdiag_components/styles.tcss'
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.13/asyncio/base_events.py", line 725, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/dietpi/netdiag/app.py", line 28, in <module>
+    app.run()
+    ~~~~~~~^^
+  File "/usr/local/lib/python3.13/dist-packages/textual/app.py", line 2251, in run
+    return asyncio.run(run_app())
+           ~~~~~~~~~~~^^^^^^^^^^^
+  File "/usr/lib/python3.13/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.13/asyncio/runners.py", line 123, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt

@@ -1,0 +1,17 @@
+Screen {
+    background: #1a1b26;
+    color: #c0caf5;
+}
+
+Header {
+    background: #16161e;
+    color: #7aa2f7;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 2;
+}
