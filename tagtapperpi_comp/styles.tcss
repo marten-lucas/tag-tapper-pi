@@ -43,17 +43,15 @@ TabPane {
 /* System buttons column */
 #system_buttons {
     layout: vertical;
-    gap: 1;
+    padding: 1 0;
 }
 
 /* Flat, web-like buttons */
 Button.flat {
     background: transparent;
     color: #c0caf5;
-    border: none;
-    border-radius: 6;
     padding: 0 4;
-    transition: background 150ms ease;
+    margin: 0 0 1 0;
 }
 
 Button.flat:hover {
@@ -86,7 +84,7 @@ Button.danger.flat:hover, Button.flat.danger:hover {
     background: #0f1324;
     border: tall #2a2e42;
     align-horizontal: right;
-    gap: 1;
+    padding-right: 1;
 }
 
 Button.nav {
