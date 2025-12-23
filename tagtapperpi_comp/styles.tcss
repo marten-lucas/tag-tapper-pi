@@ -21,7 +21,6 @@ Screen {
     background: #003366;
     color: #ffffff;
     border: tall #00ff00;
-    border-radius: 4;
 }
 
 #center_btn:focus,
