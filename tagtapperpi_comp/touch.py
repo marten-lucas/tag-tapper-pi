@@ -135,19 +135,16 @@ def post_click(target_app, x: Optional[int] = None, y: Optional[int] = None) -> 
     This function attempts multiple constructor patterns for `textual.events.Click`
     to remain compatible across Textual versions. It logs successes/failures.
     """
+    try:
+        # target the center button if present
+        widget = None
         try:
-            # target the center button if present
-            widget = None
-            try:
-                widget = target_app.query_one("#center_btn")
-            except Exception:
-                try:
-                    widget = target_app.query_one("#label")
-                except Exception:
-                    widget = None
-
+            widget = target_app.query_one("#center_btn")
         except Exception:
-            widget = None
+            try:
+                widget = target_app.query_one("#label")
+            except Exception:
+                widget = None
 
         if Click is None or widget is None:
             logging.debug("Click event not available or target widget not found")
