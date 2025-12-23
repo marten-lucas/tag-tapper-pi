@@ -13,6 +13,10 @@ cd "$REPO_DIR"
 echo "Pulling latest changes..."
 git pull
 
+echo "updating service"
+cp tag-tapper.service /etc/systemd/system/tag-tagger-pi.service
+sudo systemctl daemon-reload
+
 echo "Ensuring log file exists and is owned by 'dietpi'..."
 sudo touch "$LOG_FILE" || true
 sudo chown dietpi:dietpi "$LOG_FILE" || true
