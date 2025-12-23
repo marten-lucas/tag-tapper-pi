@@ -12,7 +12,7 @@ echo "Pulling latest changes..."
 git pull
 
 echo "Updating service unit..."
-sudo cp tag-tapper-pi.service /etc/systemd/system/${SERVICE_NAME}
+sudo cp ${SERVICE_NAME} /etc/systemd/system/${SERVICE_NAME}
 sudo systemctl daemon-reload
 
 echo "Ensuring log file exists and is owned by 'dietpi'..."

@@ -24,7 +24,7 @@ sudo ./start.sh
 
 **Option 1: Systemd Service (empfohlen)**
 
-Erstelle `/etc/systemd/system/tag-tapper.service`:
+Erstelle `/etc/systemd/system/tag-tapper-pi.service`:
 ```ini
 [Unit]
 Description=Tag Tapper Network Dashboard
@@ -38,11 +38,12 @@ Environment="TERM=linux"
 Environment="COLORTERM=truecolor"
 Environment="TEXTUAL_DRIVER=linux"
 Environment="TEXTUAL_COLOR_SYSTEM=truecolor"
-ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/app.py
+ExecStart=/usr/bin/env bash /home/dietpi/tag-tapper-pi/start.sh
 StandardInput=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
+StandardError=append:/home/dietpi/tag-tapper-pi/tag-tapper-pi.log
 Restart=on-failure
 
 [Install]
@@ -52,13 +53,13 @@ WantedBy=multi-user.target
 Aktiviere den Service:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable tag-tapper
-sudo systemctl start tag-tapper
+sudo systemctl enable tag-tapper-pi
+sudo systemctl start tag-tapper-pi
 ```
 
 Status prüfen:
 ```bash
-sudo systemctl status tag-tapper
+sudo systemctl status tag-tapper-pi
 ```
 
 **Option 2: rc.local**
@@ -77,8 +78,8 @@ su - dietpi -c "cd /home/dietpi/tag-tapper-pi && TERM=linux COLORTERM=truecolor 
 
 ### App startet nicht
 
-- Prüfe Logs: `tail -f /home/dietpi/error.log`
-- Prüfe systemd: `sudo journalctl -u tag-tapper -f`
+- Prüfe Logs: `tail -f /home/dietpi/tag-tapper-pi/tag-tapper-pi.log`
+- Prüfe systemd: `sudo journalctl -u tag-tapper-pi -f`
 
 ### SSH-Zugriff während App läuft
 
