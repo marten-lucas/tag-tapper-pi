@@ -12,7 +12,7 @@ clear
 export TERM=linux
 export LANG=de_DE.UTF-8
 export COLORTERM=truecolor
-export TEXTUAL_DRIVER=linux
+export TEXTUAL_DRIVER=textual.driver.linux
 export TEXTUAL_COLOR_SYSTEM=truecolor
 
 ERROR_LOG=/home/dietpi/error.log
