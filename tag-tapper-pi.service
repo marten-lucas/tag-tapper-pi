@@ -1,0 +1,25 @@
+[Unit]
+Description=Trunk Tagger Pi Dashboard
+After=network.target multi-user.target gpm.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+ExecStart=/home/dietpi/tag-tapper-pi/start.sh
+WorkingDirectory=/home/dietpi/tag-tapper-pi
+User=root
+Group=root
+
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+StandardError=append:/home/dietpi/tag-tapper-pi/tag-tapper-pi.log
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

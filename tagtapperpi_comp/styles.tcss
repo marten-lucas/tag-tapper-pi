@@ -4,9 +4,36 @@ Screen {
     color: #ffffff;
 }
 
-Header, Footer {
+#main {
+    layout: grid;
+    grid-size: 1 1;
+    align: center middle;
+    padding: 1;
+}
+
+#center_btn {
+    width: 25;
+    height: 7;
+    min-width: 25;
+    min-height: 7;
+    content-align: center middle;
+    text-style: bold;
+    background: #003366;
+    color: #ffffff;
+    border: tall #00ff00;
+    border-radius: 4;
+}
+
+#center_btn:focus,
+#center_btn:hover {
+    background: #002244;
+    border: tall #ffff00;
+}
+
+/* Header, Footer {
     background: #1a1a1a;
     color: #00aaff;
+} */
 
 /* Tabs area fills remaining height */
 TabbedContent#tabs {

@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Helper to update the repo, ensure log file ownership, restart service and follow logs.
-# Edit SERVICE_NAME if your unit file has a different name.
-SERVICE_NAME=tag-tapper.service
+SERVICE_NAME=tag-tapper-pi.service
 REPO_DIR=/home/dietpi/tag-tapper-pi
 LOG_FILE=${REPO_DIR}/tag-tapper-pi.log
 ERR_LOG=${REPO_DIR}/error.log
@@ -13,8 +11,8 @@ cd "$REPO_DIR"
 echo "Pulling latest changes..."
 git pull
 
-echo "updating service"
-cp tag-tapper.service /etc/systemd/system/tag-tagger-pi.service
+echo "Updating service unit..."
+sudo cp tag-tapper-pi.service /etc/systemd/system/${SERVICE_NAME}
 sudo systemctl daemon-reload
 
 echo "Ensuring log file exists and is owned by 'dietpi'..."
