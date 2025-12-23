@@ -1,17 +1,101 @@
+/* Tokyo Night dark theme */
 Screen {
     background: #1a1b26;
     color: #c0caf5;
 }
 
-Header {
+Header, Footer {
     background: #16161e;
     color: #7aa2f7;
 }
 
-TabbedContent {
+/* Tabs area fills remaining height */
+TabbedContent#tabs {
     height: 1fr;
 }
 
+/* Larger tabs for touch */
+TabbedContent Tab {
+    height: 3;
+    padding: 0 2;
+    background: #1f2335;
+    color: #c0caf5;
+    border: tall #2a2e42;
+}
+
+TabbedContent Tab.-active {
+    background: #2a2e42;
+    color: #e0e9ff;
+    border: tall #7aa2f7;
+}
+
+/* Content padding inside each tab */
 TabPane {
     padding: 2;
+}
+
+/* Containers inside tabs */
+#ip_container, #ping_container, #wifi_container {
+    layout: vertical;
+    height: 1fr;
+}
+
+/* System buttons column */
+#system_buttons {
+    layout: vertical;
+    gap: 1;
+}
+
+/* Flat, web-like buttons */
+Button.flat {
+    background: transparent;
+    color: #c0caf5;
+    border: none;
+    border-radius: 6;
+    padding: 0 4;
+    transition: background 150ms ease;
+}
+
+Button.flat:hover {
+    background: rgba(122,162,247,0.10);
+}
+
+/* Large and full-width helpers */
+Button.large {
+    height: 3;
+}
+
+Button.full {
+    width: 1fr;
+}
+
+/* Danger variant for flat buttons (text color + subtle hover fill) */
+Button.danger.flat, Button.flat.danger {
+    color: #ff7b90;
+}
+
+Button.danger.flat:hover, Button.flat.danger:hover {
+    background: rgba(247,118,142,0.12);
+}
+
+/* Bottom navigation bar */
+#nav {
+    dock: bottom;
+    height: 4;
+    padding: 0 1;
+    background: #0f1324;
+    border: tall #2a2e42;
+    align-horizontal: right;
+    gap: 1;
+}
+
+Button.nav {
+    background: #7dcfff;
+    color: #0b1021;
+    border: tall #7dcfff;
+}
+
+Button.nav:hover {
+    background: #9ad7ff;
+    border: tall #9ad7ff;
 }
