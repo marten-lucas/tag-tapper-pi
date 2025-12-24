@@ -1,7 +1,7 @@
 import logging
 import os
 from textual.app import App, ComposeResult
-from textual.widgets import Static
+from textual.widgets import Static, TabbedContent, TabPane, Header, Footer
 from textual.containers import Container
 from textual.reactive import reactive
 from tagtapperpi_comp import touch as touch_mod
@@ -26,43 +26,76 @@ class TagTapperApp(App):
     touched = reactive(False)
 
     CSS = """
-    #main {
-        align: center middle;
-        width: 100%;
+    Screen {
+        background: #000000;
+    }
+    
+    Header {
+        background: #003366;
+        color: #ffffff;
+    }
+    
+    TabbedContent {
         height: 100%;
     }
     
-    #label {
-        width: 30;
-        height: 9;
+    /* Large touch-friendly tabs with equal width */
+    Tabs {
+        background: #001122;
+        height: 4;
+    }
+    
+    Tab {
+        height: 3;
+        width: 1fr;
+        padding: 0;
+        background: #002244;
+        color: #aaaaaa;
+        text-style: bold;
+        content-align: center bottom;
+        text-align: center;
+    }
+    
+    Tab:hover {
+        background: #003366;
+    }
+    
+    Tab.-active {
+        background: #004488;
+        color: #00ff00;
+        text-style: bold;
+    }
+    
+    TabPane {
+        padding: 2;
+        background: #000000;
+    }
+    
+    .tab-content {
+        align: center middle;
+        width: 100%;
+        height: 100%;
         content-align: center middle;
         text-align: center;
         text-style: bold;
-        padding: 1 2;
+        color: #00ff00;
     }
     """
 
     def compose(self) -> ComposeResult:
-        with Container(id="main"):
-            yield Static("Touch me", id="label")
+        yield Header(show_clock=False)
+        with TabbedContent(initial="ip"):
+            with TabPane("IP", id="ip"):
+                yield Container(Static("IP Configuration\n\nComing soon...", classes="tab-content"))
+            with TabPane("Ping", id="ping"):
+                yield Container(Static("Ping Test\n\nComing soon...", classes="tab-content"))
+            with TabPane("Range", id="range"):
+                yield Container(Static("Range Scanner\n\nComing soon...", classes="tab-content"))
+            with TabPane("Power", id="power"):
+                yield Container(Static("Power Options\n\nComing soon...", classes="tab-content"))
 
-    def watch_touched(self, value: bool) -> None:
-        """Triggered automatisch bei Änderung von self.touched."""
-        label = self.query_one("#label")
-        
-        if value:
-            label.styles.background = "#004400"
-            label.styles.border = ("double", "#FFFF00")
-            label.update("Touched!")
-        else:
-            label.styles.background = "#003366"
-            label.styles.border = ("round", "#00FF00")
-            label.update("Touch me")
-
-    def action_trigger_touch(self):
-        """Wird vom touch_monitor Thread aufgerufen."""
-        logging.info("Hardware-Touch erkannt -> Toggle State")
-        self.touched = not self.touched
+    # Touch events are now handled by Textual's built-in mouse event system
+    # The touch monitor posts MouseDown events that Textual routes to widgets
 
     def on_mount(self) -> None:
         logging.info("App gestartet. Initialisiere Touch-Monitor...")
