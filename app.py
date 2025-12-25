@@ -219,8 +219,11 @@ class TagTapperApp:
     """Pygame-based TUI with tabs and touch support."""
     
     TABS = [
-        {"id": "ip", "label": "Network", "content": "IP Configuration\n\nComing soon..."},
-        {"id": "power", "label": "System", "content": "Power & System\n\nComing soon..."}
+        {"id": "ip", "label": "IP", "content": "IP Configuration\n\nComing soon..."},
+        {"id": "ping", "label": "Ping", "content": "Ping Test\n\nComing soon..."},
+        {"id": "range", "label": "Range", "content": "Range Scanner\n\nComing soon..."},
+        {"id": "reboot", "label": "Reboot", "content": "Reboot System\n\nComing soon..."},
+        {"id": "shutdown", "label": "Shutdown", "content": "Shutdown System\n\nComing soon..."}
     ]
     
     # Colors
@@ -243,30 +246,50 @@ class TagTapperApp:
         self.touch_start_x = None
         self.touch_start_y = None
         
-        # Layout constants - full screen carousel
+        # Layout constants - header + carousel
+        self.header_height = 35
         self.indicator_radius = 8
         self.indicator_spacing = 24
         self.indicator_y = self.height - 30
         
         # Fonts
+        self.header_font = pygame.font.Font(None, 28)
         self.title_font = pygame.font.Font(None, 64)
         self.content_font = pygame.font.Font(None, 40)
         
+    def draw_header(self, surface):
+        """Draw persistent header with title and date/time."""
+        header_rect = pygame.Rect(0, 0, self.width, self.header_height)
+        pygame.draw.rect(surface, self.HEADER_BG, header_rect)
+        
+        # Title left
+        title = self.header_font.render("Tag Tapper Pi", True, self.TEXT_COLOR)
+        surface.blit(title, (10, (self.header_height - title.get_height()) // 2))
+        
+        # Date/Time right
+        import datetime
+        now = datetime.datetime.now()
+        time_str = now.strftime("%d.%m.%Y %H:%M")
+        time_text = self.header_font.render(time_str, True, self.TEXT_COLOR)
+        surface.blit(time_text, (self.width - time_text.get_width() - 10, (self.header_height - time_text.get_height()) // 2))
+    
     def draw_content(self, surface):
-        """Draw the carousel content - full screen."""
-        surface.fill(self.BG_COLOR)
+        """Draw the carousel content - below header."""
+        # Content area (below header)
+        content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
+        pygame.draw.rect(surface, self.BG_COLOR, content_rect)
         
         # Active tab
         tab = self.TABS[self.active_tab]
         
-        # Title at top
+        # Title at top of content
         title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
-        title_rect = title.get_rect(center=(self.width // 2, 80))
+        title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
         surface.blit(title, title_rect)
         
         # Content in center
         lines = tab["content"].split('\n')
-        y_offset = 160
+        y_offset = self.header_height + 140
         for line in lines:
             if line.strip():
                 text = self.content_font.render(line, True, (200, 200, 200))
@@ -292,6 +315,8 @@ class TagTapperApp:
     
     def draw(self, surface):
         """Draw the complete UI."""
+        surface.fill(self.BG_COLOR)
+        self.draw_header(surface)
         self.draw_content(surface)
     
     def handle_touch_start(self, x, y):
