@@ -8,6 +8,7 @@ import mmap
 import struct
 import yaml
 import numpy as np
+from collections import deque
 
 try:
     import pygame
@@ -252,11 +253,17 @@ class TagTapperApp:
         self.indicator_spacing = 24
         self.indicator_y = self.height - 30
         
-        # Fonts
-        self.header_font = pygame.font.Font(None, 18)
-        self.tab_title_font = pygame.font.Font(None, 22)
-        self.title_font = pygame.font.Font(None, 64)
-        self.content_font = pygame.font.Font(None, 40)
+        # Fonts (slightly larger)
+        self.header_font = pygame.font.Font(None, 22)
+        self.tab_title_font = pygame.font.Font(None, 26)
+        self.title_font = pygame.font.Font(None, 72)
+        self.content_font = pygame.font.Font(None, 44)
+
+        # Position smoothing buffer for touch POS events
+        self.pos_buffer = deque(maxlen=4)
+        # Swipe debounce control
+        self.last_swipe_time = 0.0
+        self.swipe_debounce = 0.2  # seconds
         
     def draw_header(self, surface):
         """Draw persistent header with title and date/time."""
@@ -266,7 +273,12 @@ class TagTapperApp:
         # Title left
         title = self.header_font.render("Tag Tapper Pi", True, self.TEXT_COLOR)
         surface.blit(title, (10, (self.header_height - title.get_height()) // 2))
-        
+
+        # Current tab title centered in header
+        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_COLOR)
+        tab_label_rect = tab_label.get_rect(center=(self.width // 2, self.header_height // 2))
+        surface.blit(tab_label, tab_label_rect)
+
         # Date/Time right
         import datetime
         now = datetime.datetime.now()
@@ -282,11 +294,6 @@ class TagTapperApp:
         
         # Active tab
         tab = self.TABS[self.active_tab]
-
-        # Current tab small title line (under header)
-        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_ACTIVE)
-        tab_label_rect = tab_label.get_rect(center=(self.width // 2, self.header_height + 18))
-        surface.blit(tab_label, tab_label_rect)
 
         # Title at top of content
         title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
@@ -332,22 +339,29 @@ class TagTapperApp:
             return False
         
         delta_x = end_x - start_x
-        threshold = 60  # Minimum swipe distance in pixels
-        
+        threshold = 50  # Minimum swipe distance in pixels (reduced for responsiveness)
+
         logging.info(f"Swipe: start_x={start_x} end_x={end_x} delta={delta_x}")
-        
+
+        # Debounce: ignore additional swipes within debounce interval
+        now = time.time()
+        if now - self.last_swipe_time < self.swipe_debounce:
+            return False
+
         if abs(delta_x) > threshold:
             if delta_x > 0:  # Swipe right → previous tab
                 if self.active_tab > 0:
                     self.active_tab -= 1
                     logging.info(f"Swipe RIGHT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
+                    self.last_swipe_time = now
                     return True
             else:  # Swipe left → next tab
                 if self.active_tab < len(self.TABS) - 1:
                     self.active_tab += 1
                     logging.info(f"Swipe LEFT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
+                    self.last_swipe_time = now
                     return True
-        
+
         return False
     
 
@@ -407,6 +421,11 @@ def main():
                             app.last_touch_y = None
                             app.touch_start_x = None
                             app.touch_start_y = None
+                            # clear position buffer after release
+                            try:
+                                app.pos_buffer.clear()
+                            except Exception:
+                                pass
                         logging.debug(f'Touch event -> touched={touched}')
                     
                     elif ev[0] == 'POS':
@@ -414,12 +433,19 @@ def main():
                         _, x, y, p = ev
                         if x is not None and y is not None:
                             sx, sy = map_raw_to_screen(x, y, size, calib)
-                            logging.debug(f"Touch raw: X={x} Y={y} -> screen: X={sx} Y={sy}")
+                            # Append to smoothing buffer and compute averages
+                            try:
+                                app.pos_buffer.append((sx, sy))
+                                bx = int(sum(p[0] for p in app.pos_buffer) / len(app.pos_buffer))
+                                by = int(sum(p[1] for p in app.pos_buffer) / len(app.pos_buffer))
+                            except Exception:
+                                bx, by = sx, sy
+                            logging.debug(f"Touch raw: X={x} Y={y} -> screen: X={sx} Y={sy} avg: X={bx} Y={by}")
                             # Set touch_start on first POS event after press
                             if touched and app.touch_start_x is None:
-                                app.handle_touch_start(sx, sy)
-                            app.last_touch_x = sx
-                            app.last_touch_y = sy
+                                app.handle_touch_start(bx, by)
+                            app.last_touch_x = bx
+                            app.last_touch_y = by
             
             except queue.Empty:
                 pass
