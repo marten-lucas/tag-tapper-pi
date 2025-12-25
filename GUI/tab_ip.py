@@ -64,9 +64,6 @@ class TabIP:
         # ensure eth0 present first (if exists)
         if 'eth0' in ifaces:
             candidates.append('eth0')
-        # add wlan* interfaces
-        for n in sorted(ifaces):
-            if n.startswith('wlan') or n.startswith('wl'):
                 if n not in candidates:
                     candidates.append(n)
         # add VLAN-like interfaces (contain a dot)
@@ -76,19 +73,25 @@ class TabIP:
 
         # Prepare drawing positions
         row_h = fonts['content'].get_height() + 8
-        start_y = rect.top + 120
-        name_x = rect.left + 40
-        ip_x = rect.right - 260
-        status_x = rect.right - 80
-
-        # Header row for table
-        hdr_name = fonts['content'].render('Schnittstelle', True, styles.TEXT_COLOR)
-        hdr_ip = fonts['content'].render('IP', True, styles.TEXT_COLOR)
-        surface.blit(hdr_name, (name_x, rect.top + 100))
-        surface.blit(hdr_ip, (ip_x, rect.top + 100))
-
-        # Rows
-        for i, iface in enumerate(candidates):
+            candidates = []
+            # ensure eth0 present first (if exists)
+            if 'eth0' in ifaces:
+                candidates.append('eth0')
+            # add VLAN-like interfaces (contain a dot) in numeric order by VLAN id
+            vlans = [n for n in ifaces if '.' in n]
+            # sort by numeric VLAN id if possible
+            def vlan_key(name):
+                try:
+                    return int(name.split('.')[-1])
+                except Exception:
+                    return 0
+            for n in sorted(vlans, key=vlan_key):
+                candidates.append(n)
+            # add wlan* interfaces at the end
+            for n in sorted(ifaces):
+                if n.startswith('wlan') or n.startswith('wl'):
+                    if n not in candidates:
+                        candidates.append(n)
             y = start_y + i * row_h
             ip = self.get_ip_for_iface(iface)
             # Name
@@ -98,10 +101,12 @@ class TabIP:
                 if vid in vlan_names:
                     display_name = f"{iface} — {vlan_names[vid]}"
             name_s = fonts['content'].render(display_name, True, styles.TEXT_COLOR)
-            surface.blit(name_s, (name_x, y))
-            # IP (or '-')</n+            ip_text = ip if ip else '-'
-            ip_s = fonts['content'].render(ip_text, True, (200, 200, 200))
-            surface.blit(ip_s, (ip_x, y))
+            hdr_name = fonts['content'].render('Schnittstelle', True, styles.TEXT_COLOR)
+            hdr_ip = fonts['content'].render('IP', True, styles.TEXT_COLOR)
+            hdr_status = fonts['content'].render('OK', True, styles.TEXT_COLOR)
+            surface.blit(hdr_name, (name_x, rect.top + 100))
+            surface.blit(hdr_ip, (ip_x, rect.top + 100))
+            surface.blit(hdr_status, (status_x - 10, rect.top + 100))
             # Status symbol
             if ip:
                 sym = '✓'
@@ -111,3 +116,5 @@ class TabIP:
                 color = (200, 60, 60)
             sym_s = fonts['content'].render(sym, True, color)
             surface.blit(sym_s, sym_s.get_rect(center=(status_x, y + row_h // 2)))
+
+                        display_name = f"{iface} {vlan_names[vid]}"
