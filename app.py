@@ -224,8 +224,8 @@ class TagTapperApp:
         {"id": "ip", "label": "IP", "content": "IP Configuration\n\nComing soon..."},
         {"id": "ping", "label": "Ping", "content": "Ping Test\n\nComing soon..."},
         {"id": "range", "label": "Range", "content": "Range Scanner\n\nComing soon..."},
-        {"id": "reboot", "label": "Reboot", "content": "Reboot System\n\nComing soon..."},
-        {"id": "shutdown", "label": "Shutdown", "content": "Shutdown System\n\nComing soon..."}
+        {"id": "reboot", "label": "Reboot", "content": ""},
+        {"id": "shutdown", "label": "Shutdown", "content": ""}
     ]
     
     # Colors
@@ -271,6 +271,10 @@ class TagTapperApp:
         self.long_press_duration = 5.0  # seconds to trigger action
         self.long_press_progress = 0.0
         self.long_press_executed = False
+        # Animation state for pre-execution
+        self.exec_after_anim = None
+        self.anim_start = None
+        self.anim_duration = 1.0  # seconds for pre-exec animation
         
     def draw_header(self, surface):
         """Draw persistent header with title and date/time."""
@@ -341,9 +345,9 @@ class TagTapperApp:
         if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
             # position the progress indicator near center under the large title
             cx = self.width // 2
-            cy = self.header_height + 140
-            radius = 40
-            thickness = 8
+            cy = self.header_height + 160
+            radius = 64
+            thickness = 12
             # Background ring
             pygame.draw.circle(surface, (60, 60, 60), (cx, cy), radius, thickness)
             # Progress arc (start at top)
@@ -356,12 +360,25 @@ class TagTapperApp:
                     pygame.draw.arc(surface, (0, 200, 0), rect, start_angle, end_angle, thickness)
                 except Exception:
                     pass
+            # Subtle hint placed below the progress ring (keeps it free)
+            try:
+                hint = self.header_font.render("5s halten zum Bestätigen", True, (160, 160, 160))
+                hint_rect = hint.get_rect(center=(cx, cy + radius + 22))
+                surface.blit(hint, hint_rect)
+            except Exception:
+                pass
     
     def draw(self, surface):
         """Draw the complete UI."""
         surface.fill(self.BG_COLOR)
         self.draw_header(surface)
         self.draw_content(surface)
+        # If an execution animation is active, draw it on top
+        if self.exec_after_anim is not None:
+            try:
+                self.draw_animation(surface)
+            except Exception:
+                pass
     
     def handle_touch_start(self, x, y):
         """Record touch start position for swipe detection."""
@@ -399,6 +416,38 @@ class TagTapperApp:
                     return True
 
         return False
+
+    def draw_animation(self, surface):
+        """Draw a short pre-execution animation (spinner + fade)."""
+        if self.anim_start is None:
+            return
+        try:
+            import math
+            now = time.time()
+            t = (now - self.anim_start) / max(0.0001, self.anim_duration)
+            t = max(0.0, min(1.0, t))
+            # Fade overlay
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            alpha = int(180 * t)
+            overlay.fill((0, 0, 0, alpha))
+            surface.blit(overlay, (0, 0))
+
+            # Spinner at center
+            cx = self.width // 2
+            cy = self.header_height + 160
+            radius = 70
+            thickness = 14
+            start_angle = -math.pi / 2
+            end_angle = start_angle + (t * 2 * math.pi)
+            rect = pygame.Rect(cx - radius, cy - radius, radius * 2, radius * 2)
+            pygame.draw.arc(surface, (255, 200, 0), rect, start_angle, end_angle, thickness)
+
+            # Text "Executing..."
+            txt = self.content_font.render("Executing…", True, (255, 200, 0))
+            rtxt = txt.get_rect(center=(cx, cy + radius + 30))
+            surface.blit(txt, rtxt)
+        except Exception:
+            pass
     
 
 
@@ -515,16 +564,11 @@ def main():
                             prog = max(0.0, min(1.0, dt / app.long_press_duration))
                             app.long_press_progress = prog
                             if prog >= 1.0 and not app.long_press_executed:
-                                # Execute action
+                                # Start pre-execution animation; actual exec happens after animation
                                 tabid = app.TABS[app.active_tab]["id"]
-                                logging.info(f"Long-press triggered for {tabid}")
-                                try:
-                                    if tabid == 'reboot':
-                                        subprocess.Popen(['sudo', 'reboot'])
-                                    elif tabid == 'shutdown':
-                                        subprocess.Popen(['sudo', 'poweroff'])
-                                except Exception as e:
-                                    logging.error(f"Failed to execute {tabid}: {e}")
+                                logging.info(f"Long-press triggered for {tabid}; starting pre-exec animation")
+                                app.exec_after_anim = tabid
+                                app.anim_start = now
                                 app.long_press_executed = True
                 else:
                     # Not holding or different tab: ensure progress reset
@@ -540,6 +584,42 @@ def main():
             app.draw(screen)
             # Push buffer to framebuffer
             fbw.blit_surface(screen)
+            # If a pre-exec animation is running, check for completion and perform cleanup+exec
+            try:
+                if app.exec_after_anim is not None and app.anim_start is not None:
+                    if time.time() - app.anim_start >= app.anim_duration:
+                        tabid = app.exec_after_anim
+                        logging.info(f"Pre-exec animation complete for {tabid}; performing cleanup and executing")
+                        # stop touch thread
+                        stop_event.set()
+                        try:
+                            t.join(timeout=2)
+                        except Exception:
+                            pass
+                        # close framebuffer
+                        try:
+                            fbw.close()
+                        except Exception:
+                            pass
+                        # quit pygame
+                        try:
+                            pygame.quit()
+                        except Exception:
+                            pass
+                        # execute system action
+                        try:
+                            if tabid == 'reboot':
+                                subprocess.Popen(['sudo', 'reboot'])
+                            elif tabid == 'shutdown':
+                                subprocess.Popen(['sudo', 'poweroff'])
+                        except Exception as e:
+                            logging.error(f"Failed to execute {tabid}: {e}")
+                        # short delay then exit loop
+                        time.sleep(0.3)
+                        running = False
+                        break
+            except Exception:
+                pass
             
             clock.tick(30)  # 30 FPS
     
