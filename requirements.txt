@@ -1,2 +1,3 @@
-textual>=0.55
+pygame
+evdev
 pyyaml
