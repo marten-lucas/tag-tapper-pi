@@ -10,6 +10,7 @@ import yaml
 import numpy as np
 from collections import deque
 from tagtapperpi_comp.GUI import styles
+from tagtapperpi_comp.GUI import tabs as tabs_module
 import subprocess
 
 try:
@@ -275,6 +276,12 @@ class TagTapperApp:
         except Exception:
             self.components = {}
 
+        # Tabs/header component (handles title, indicators and swipe)
+        try:
+            self.tabs = tabs_module.Tabs()
+        except Exception:
+            self.tabs = None
+
         # Position smoothing buffer for touch POS events
         self.pos_buffer = deque(maxlen=4)
         # Swipe debounce control
@@ -291,47 +298,22 @@ class TagTapperApp:
         self.anim_start = None
         self.anim_duration = 1.0  # seconds for pre-exec animation
         
-    def draw_header(self, surface):
-        """Draw persistent header with title and date/time."""
-        header_rect = pygame.Rect(0, 0, self.width, self.header_height)
-        pygame.draw.rect(surface, self.HEADER_BG, header_rect)
-        
-        # Title left
-        title = self.header_font.render("Tag Tapper Pi", True, self.TEXT_COLOR)
-        surface.blit(title, (10, (self.header_height - title.get_height()) // 2))
-
-        # Current tab title centered in header
-        # Highlight this title: colored and bold as the only bold element
-        try:
-            self.tab_title_font.set_bold(True)
-        except Exception:
-            pass
-        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_ACTIVE)
-        tab_label_rect = tab_label.get_rect(center=(self.width // 2, self.header_height // 2))
-        surface.blit(tab_label, tab_label_rect)
-        try:
-            self.tab_title_font.set_bold(False)
-        except Exception:
-            pass
-
-        # Date/Time right
-        import datetime
-        now = datetime.datetime.now()
-        time_str = now.strftime("%d.%m.%Y %H:%M")
-        time_text = self.header_font.render(time_str, True, self.TEXT_COLOR)
-        surface.blit(time_text, (self.width - time_text.get_width() - 10, (self.header_height - time_text.get_height()) // 2))
     
-    def draw_content(self, surface):
-        """Draw the carousel content - below header."""
-        # Content area (below header)
-        content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
-        pygame.draw.rect(surface, self.BG_COLOR, content_rect)
-        
-        # Active tab
-        tab = self.TABS[self.active_tab]
+    
+    def draw(self, surface):
+        """Draw the complete UI (header + content)."""
+        surface.fill(styles.BG_COLOR)
+        # Render header and indicators via Tabs component -> get safe content rect
+        if self.tabs is not None:
+            try:
+                content_rect = self.tabs.render(surface, self, styles, self.fonts)
+            except Exception:
+                content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
+        else:
+            content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
 
-        # Delegate content rendering to the tab component
-        content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
+        # Delegate rendering of the content area to the active component
+        tab = self.TABS[self.active_tab]
         comp = self.components.get(tab['id']) if hasattr(self, 'components') else None
         if comp:
             try:
@@ -339,46 +321,9 @@ class TagTapperApp:
             except Exception:
                 pass
         else:
-            # Fallback: display label
-            title = self.title_font.render(tab['label'], True, self.TEXT_ACTIVE)
+            title = self.title_font.render(tab['label'], True, styles.TEXT_ACTIVE)
             surface.blit(title, title.get_rect(center=(self.width // 2, self.header_height + 60)))
-        
-        # Page indicators at bottom
-        total_width = len(self.TABS) * self.indicator_spacing
-        start_x = (self.width - total_width) // 2 + self.indicator_radius
-        
-        for i in range(len(self.TABS)):
-            x = start_x + i * self.indicator_spacing
-            if i == self.active_tab:
-                pygame.draw.circle(surface, self.TEXT_ACTIVE, (x, self.indicator_y), self.indicator_radius)
-            else:
-                pygame.draw.circle(surface, (80, 80, 80), (x, self.indicator_y), self.indicator_radius, 2)
 
-        # Draw long-press progress for destructive tabs (reboot/shutdown)
-        if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
-            # position the (larger) progress indicator near center under the big title/hint
-            cx = self.width // 2
-            cy = self.header_height + 190
-            radius = 96
-            thickness = 16
-            # Background ring
-            pygame.draw.circle(surface, (60, 60, 60), (cx, cy), radius, thickness)
-            # Progress arc (start at top)
-            if self.long_press_progress > 0:
-                try:
-                    import math
-                    start_angle = -math.pi / 2
-                    end_angle = start_angle + (self.long_press_progress * 2 * math.pi)
-                    rect = pygame.Rect(cx - radius, cy - radius, radius * 2, radius * 2)
-                    pygame.draw.arc(surface, (0, 200, 0), rect, start_angle, end_angle, thickness)
-                except Exception:
-                    pass
-    
-    def draw(self, surface):
-        """Draw the complete UI."""
-        surface.fill(self.BG_COLOR)
-        self.draw_header(surface)
-        self.draw_content(surface)
         # If an execution animation is active, draw it on top
         if self.exec_after_anim is not None:
             try:
@@ -392,36 +337,7 @@ class TagTapperApp:
         self.touch_start_y = y
         logging.debug(f"Touch start: X={x} Y={y}")
     
-    def handle_swipe(self, start_x, end_x):
-        """Detect and handle swipe gestures."""
-        if start_x is None or end_x is None:
-            return False
-        
-        delta_x = end_x - start_x
-        threshold = 50  # Minimum swipe distance in pixels (reduced for responsiveness)
-
-        logging.info(f"Swipe: start_x={start_x} end_x={end_x} delta={delta_x}")
-
-        # Debounce: ignore additional swipes within debounce interval
-        now = time.time()
-        if now - self.last_swipe_time < self.swipe_debounce:
-            return False
-
-        if abs(delta_x) > threshold:
-            if delta_x > 0:  # Swipe right → previous tab
-                if self.active_tab > 0:
-                    self.active_tab -= 1
-                    logging.info(f"Swipe RIGHT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
-                    self.last_swipe_time = now
-                    return True
-            else:  # Swipe left → next tab
-                if self.active_tab < len(self.TABS) - 1:
-                    self.active_tab += 1
-                    logging.info(f"Swipe LEFT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
-                    self.last_swipe_time = now
-                    return True
-
-        return False
+    # Swipe handling moved to Tabs component
 
     def draw_animation(self, surface):
         """Draw a short pre-execution animation (spinner + fade)."""
@@ -509,7 +425,11 @@ def main():
                             touched = False
                             # On release: attempt swipe handling, then reset long-press state
                             if app.touch_start_x is not None and app.last_touch_x is not None:
-                                app.handle_swipe(app.touch_start_x, app.last_touch_x)
+                                try:
+                                    if app.tabs is not None:
+                                        app.tabs.handle_swipe(app.touch_start_x, app.last_touch_x, app)
+                                except Exception:
+                                    pass
                             app.last_touch_x = None
                             app.last_touch_y = None
                             app.touch_start_x = None
