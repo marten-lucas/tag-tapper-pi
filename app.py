@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+import math
 import threading
 import queue
 import mmap
@@ -297,6 +298,12 @@ class TagTapperApp:
         self.exec_after_anim = None
         self.anim_start = None
         self.anim_duration = 1.0  # seconds for pre-exec animation
+        # Gesture timing and thresholds
+        self.touch_start_time = None
+        self.move_threshold = 30        # px, movement that cancels long-press
+        self.swipe_distance = 50        # px, min distance for swipe
+        self.swipe_max_time = 0.5       # s, max time to consider a fast swipe
+        self.tap_max_time = 0.2         # s, max time for a tap
         
     
     
@@ -420,6 +427,11 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
+                            # record start time and position (if available)
+                            app.touch_start_time = time.time()
+                            if app.last_touch_x is not None:
+                                app.touch_start_x = app.last_touch_x
+                                app.touch_start_y = app.last_touch_y
                             # Start long-press immediately for destructive tabs (position-independent)
                             try:
                                 if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
@@ -431,27 +443,53 @@ def main():
                                 pass
                         else:  # Release
                             touched = False
-                            # On release: attempt swipe handling, then reset long-press state
-                            if app.touch_start_x is not None and app.last_touch_x is not None:
-                                try:
-                                    if app.tabs is not None:
-                                        app.tabs.handle_swipe(app.touch_start_x, app.last_touch_x, app)
-                                except Exception:
-                                    pass
+                            # Decide gesture by time + movement
+                            nowt = time.time()
+                            start_t = app.touch_start_time or nowt
+                            dt = nowt - start_t
+                            sx = app.touch_start_x
+                            sy = app.touch_start_y
+                            ex = app.last_touch_x
+                            ey = app.last_touch_y
+                            did_swipe = False
+                            try:
+                                if sx is not None and ex is not None:
+                                    dx = ex - sx
+                                    dy = ey - sy if ey is not None and sy is not None else 0
+                                    dist = math.hypot(dx, dy)
+                                    if dist >= app.swipe_distance and dt <= app.swipe_max_time:
+                                        # Treat as swipe
+                                        if app.tabs is not None:
+                                            app.tabs.handle_swipe(sx, ex, app)
+                                        did_swipe = True
+                                    else:
+                                        # Not a swipe: possible tap or long-press (long-press handled elsewhere)
+                                        if dist < app.move_threshold and dt <= app.tap_max_time:
+                                            logging.info('Tap detected')
+                                else:
+                                    # No position samples: treat short press as tap
+                                    if dt <= app.tap_max_time:
+                                        logging.info('Tap detected (no pos)')
+                            except Exception:
+                                pass
+
+                            # Reset touch state
                             app.last_touch_x = None
                             app.last_touch_y = None
                             app.touch_start_x = None
                             app.touch_start_y = None
-                            # clear position buffer after release
                             try:
                                 app.pos_buffer.clear()
                             except Exception:
                                 pass
-                            # reset long-press
-                            app.long_press_start_time = None
-                            app.long_press_progress = 0.0
-                            app.long_press_target = None
-                            app.long_press_executed = False
+                            # Reset long-press state unless it already executed (keep exec flag if running)
+                            if not app.long_press_executed:
+                                app.long_press_start_time = None
+                                app.long_press_progress = 0.0
+                                app.long_press_target = None
+                            else:
+                                # if already executed, clear target but leave progress/exec flags
+                                app.long_press_target = None
                         logging.debug(f'Touch event -> touched={touched}')
                     
                     elif ev[0] == 'POS':
@@ -489,7 +527,7 @@ def main():
                     if app.touch_start_x is not None and app.last_touch_x is not None:
                         dx = app.last_touch_x - app.touch_start_x
                         dy = app.last_touch_y - app.touch_start_y
-                        if (dx * dx + dy * dy) ** 0.5 > 30:
+                        if (dx * dx + dy * dy) ** 0.5 > app.move_threshold:
                             # Movement cancelled long-press
                             app.long_press_start_time = None
                             app.long_press_progress = 0.0
