@@ -9,8 +9,8 @@ import struct
 import yaml
 import numpy as np
 from collections import deque
-from tagtapperpi_comp.GUI import styles
-from tagtapperpi_comp.GUI import tabs as tabs_module
+from GUI import styles
+from GUI import tabs as tabs_module
 import subprocess
 
 try:
@@ -265,7 +265,7 @@ class TagTapperApp:
 
         # Components per tab (created lazily here)
         try:
-            from tagtapperpi_comp.GUI import tab_ip, tab_ping, tab_range, action
+            from GUI import tab_ip, tab_ping, tab_range, action
             self.components = {
                 'ip': tab_ip.TabIP(),
                 'ping': tab_ping.TabPing(),
