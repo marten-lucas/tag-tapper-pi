@@ -15,6 +15,10 @@ sudo cp ${SERVICE_NAME} /etc/systemd/system/${SERVICE_NAME}
 sudo chmod +x start.sh
 sudo systemctl daemon-reload
 
+echo "Installing VLAN sync service and scripts..."
+sudo bash -c "${REPO_DIR}/networking/vlan-sync.sh"
+sudo systemctl daemon-reload
+
 echo "Ensuring log file exists and is owned by 'dietpi'..."
 sudo touch "$LOG_FILE" || true
 sudo chown dietpi:dietpi "$LOG_FILE" || true
