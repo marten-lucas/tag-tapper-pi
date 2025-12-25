@@ -420,7 +420,15 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
-                            # On press we don't have pos yet; long-press will start on first POS
+                            # Start long-press immediately for destructive tabs (position-independent)
+                            try:
+                                if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
+                                    app.long_press_start_time = time.time()
+                                    app.long_press_target = app.active_tab
+                                    app.long_press_progress = 0.0
+                                    app.long_press_executed = False
+                            except Exception:
+                                pass
                         else:  # Release
                             touched = False
                             # On release: attempt swipe handling, then reset long-press state
