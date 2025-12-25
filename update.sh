@@ -15,11 +15,8 @@ sudo cp ${SERVICE_NAME} /etc/systemd/system/${SERVICE_NAME}
 sudo chmod +x start.sh
 sudo systemctl daemon-reload
 echo "Installing VLAN sync service and scripts..."
-# Copy scripts to system locations and install systemd unit (do not execute repo script directly)
-sudo cp "${REPO_DIR}/networking/sync_vlans.py" /usr/local/bin/vlan-sync.py || true
-sudo chmod +x /usr/local/bin/vlan-sync.py || true
-sudo cp "${REPO_DIR}/networking/vlan-sync.sh" /usr/local/bin/vlan-sync.sh || true
-sudo chmod +x /usr/local/bin/vlan-sync.sh || true
+echo "Installing VLAN sync service (will use scripts in repo directory)..."
+# Install only the systemd unit; the service will ExecStart the script inside the repo.
 sudo cp "${REPO_DIR}/networking/vlan-sync.service" /etc/systemd/system/vlan-sync.service || true
 sudo systemctl daemon-reload
 # Enable and start the vlan-sync service so it runs at boot and now

@@ -11,8 +11,19 @@ import sys
 import subprocess
 import yaml
 
-REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG = os.path.join(REPO_DIR, 'config.yaml')
+# Determine repository/config paths. Allow overrides via environment variables
+# Priority:
+# 1) VLAN_CONFIG - full path to config.yaml
+# 2) REPO_DIR or TAGTAPPER_REPO - base repo directory containing config.yaml
+# 3) fallback: infer REPO_DIR relative to this script (works when running from repo)
+env_repo = os.environ.get('REPO_DIR') or os.environ.get('TAGTAPPER_REPO')
+if env_repo:
+    REPO_DIR = env_repo
+else:
+    REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+CONFIG = os.environ.get('VLAN_CONFIG') or os.path.join(REPO_DIR, 'config.yaml')
+print('VLAN sync: using config file:', CONFIG)
 
 DEFAULT_PREFIX = 24
 

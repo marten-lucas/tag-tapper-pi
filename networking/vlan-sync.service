@@ -5,7 +5,11 @@ Wants=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/vlan-sync.py
+# Set REPO_DIR to the repository path on the target device. Adjust if different.
+Environment=REPO_DIR=/home/dietpi/tag-tapper-pi
+Environment=VLAN_CONFIG=${REPO_DIR}/config.yaml
+WorkingDirectory=${REPO_DIR}
+ExecStart=${REPO_DIR}/networking/sync_vlans.py
 RemainAfterExit=yes
 
 [Install]
