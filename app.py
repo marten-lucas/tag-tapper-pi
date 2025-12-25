@@ -9,6 +9,7 @@ import struct
 import yaml
 import numpy as np
 from collections import deque
+from tagtapperpi_comp.GUI import styles
 import subprocess
 
 try:
@@ -221,11 +222,11 @@ class TagTapperApp:
     """Pygame-based TUI with tabs and touch support."""
     
     TABS = [
-        {"id": "ip", "label": "IP", "content": "IP Configuration\n\nComing soon..."},
-        {"id": "ping", "label": "Ping", "content": "Ping Test\n\nComing soon..."},
-        {"id": "range", "label": "Range", "content": "Range Scanner\n\nComing soon..."},
-        {"id": "reboot", "label": "Reboot", "content": ""},
-        {"id": "shutdown", "label": "Shutdown", "content": ""}
+        {"id": "ip", "label": "IP"},
+        {"id": "ping", "label": "Ping"},
+        {"id": "range", "label": "Range"},
+        {"id": "reboot", "label": "Reboot"},
+        {"id": "shutdown", "label": "Shutdown"}
     ]
     
     # Colors
@@ -254,11 +255,25 @@ class TagTapperApp:
         self.indicator_spacing = 24
         self.indicator_y = self.height - 30
         
-        # Fonts (slightly larger)
-        self.header_font = pygame.font.Font(None, 22)
-        self.tab_title_font = pygame.font.Font(None, 26)
-        self.title_font = pygame.font.Font(None, 72)
-        self.content_font = pygame.font.Font(None, 44)
+        # Fonts from styles
+        self.fonts = styles.load_fonts()
+        self.header_font = self.fonts['header']
+        self.tab_title_font = self.fonts['tab_title']
+        self.title_font = self.fonts['title']
+        self.content_font = self.fonts['content']
+
+        # Components per tab (created lazily here)
+        try:
+            from tagtapperpi_comp.GUI import tab_ip, tab_ping, tab_range, action
+            self.components = {
+                'ip': tab_ip.TabIP(),
+                'ping': tab_ping.TabPing(),
+                'range': tab_range.TabRange(),
+                'reboot': action.ActionTab('reboot'),
+                'shutdown': action.ActionTab('shutdown'),
+            }
+        except Exception:
+            self.components = {}
 
         # Position smoothing buffer for touch POS events
         self.pos_buffer = deque(maxlen=4)
@@ -315,37 +330,18 @@ class TagTapperApp:
         # Active tab
         tab = self.TABS[self.active_tab]
 
-        # Title at top of content
-        # For reboot/shutdown, replace the big title with a hint/countdown
-        if tab["id"] in ("reboot", "shutdown"):
+        # Delegate content rendering to the tab component
+        content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
+        comp = self.components.get(tab['id']) if hasattr(self, 'components') else None
+        if comp:
             try:
-                import math
-                # If long-press active, show countdown seconds; otherwise show static hint
-                if self.long_press_start_time is not None and self.long_press_target == self.active_tab:
-                    elapsed = time.time() - self.long_press_start_time
-                    remaining = int(max(0, math.ceil(self.long_press_duration - elapsed)))
-                    txt = f"Halten zum Bestätigen: {remaining}s"
-                else:
-                    txt = "5s halten zum Bestätigen"
-                title = self.title_font.render(txt, True, (220, 180, 0))
-                title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
-                surface.blit(title, title_rect)
+                comp.draw(surface, content_rect, self, styles, self.fonts)
             except Exception:
                 pass
         else:
-            title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
-            title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
-            surface.blit(title, title_rect)
-        
-        # Content in center
-        lines = tab["content"].split('\n')
-        y_offset = self.header_height + 140
-        for line in lines:
-            if line.strip():
-                text = self.content_font.render(line, True, (200, 200, 200))
-                text_rect = text.get_rect(center=(self.width // 2, y_offset))
-                surface.blit(text, text_rect)
-                y_offset += 50
+            # Fallback: display label
+            title = self.title_font.render(tab['label'], True, self.TEXT_ACTIVE)
+            surface.blit(title, title.get_rect(center=(self.width // 2, self.header_height + 60)))
         
         # Page indicators at bottom
         total_width = len(self.TABS) * self.indicator_spacing
