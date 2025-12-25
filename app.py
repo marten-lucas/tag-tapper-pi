@@ -9,6 +9,7 @@ import struct
 import yaml
 import numpy as np
 from collections import deque
+import subprocess
 
 try:
     import pygame
@@ -264,6 +265,12 @@ class TagTapperApp:
         # Swipe debounce control
         self.last_swipe_time = 0.0
         self.swipe_debounce = 0.2  # seconds
+        # Long-press (hold) control for destructive actions
+        self.long_press_start_time = None
+        self.long_press_target = None
+        self.long_press_duration = 5.0  # seconds to trigger action
+        self.long_press_progress = 0.0
+        self.long_press_executed = False
         
     def draw_header(self, surface):
         """Draw persistent header with title and date/time."""
@@ -275,9 +282,18 @@ class TagTapperApp:
         surface.blit(title, (10, (self.header_height - title.get_height()) // 2))
 
         # Current tab title centered in header
-        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_COLOR)
+        # Highlight this title: colored and bold as the only bold element
+        try:
+            self.tab_title_font.set_bold(True)
+        except Exception:
+            pass
+        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_ACTIVE)
         tab_label_rect = tab_label.get_rect(center=(self.width // 2, self.header_height // 2))
         surface.blit(tab_label, tab_label_rect)
+        try:
+            self.tab_title_font.set_bold(False)
+        except Exception:
+            pass
 
         # Date/Time right
         import datetime
@@ -320,6 +336,26 @@ class TagTapperApp:
                 pygame.draw.circle(surface, self.TEXT_ACTIVE, (x, self.indicator_y), self.indicator_radius)
             else:
                 pygame.draw.circle(surface, (80, 80, 80), (x, self.indicator_y), self.indicator_radius, 2)
+
+        # Draw long-press progress for destructive tabs (reboot/shutdown)
+        if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
+            # position the progress indicator near center under the large title
+            cx = self.width // 2
+            cy = self.header_height + 140
+            radius = 40
+            thickness = 8
+            # Background ring
+            pygame.draw.circle(surface, (60, 60, 60), (cx, cy), radius, thickness)
+            # Progress arc (start at top)
+            if self.long_press_progress > 0:
+                try:
+                    import math
+                    start_angle = -math.pi / 2
+                    end_angle = start_angle + (self.long_press_progress * 2 * math.pi)
+                    rect = pygame.Rect(cx - radius, cy - radius, radius * 2, radius * 2)
+                    pygame.draw.arc(surface, (0, 200, 0), rect, start_angle, end_angle, thickness)
+                except Exception:
+                    pass
     
     def draw(self, surface):
         """Draw the complete UI."""
@@ -413,8 +449,10 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
+                            # On press we don't have pos yet; long-press will start on first POS
                         else:  # Release
                             touched = False
+                            # On release: attempt swipe handling, then reset long-press state
                             if app.touch_start_x is not None and app.last_touch_x is not None:
                                 app.handle_swipe(app.touch_start_x, app.last_touch_x)
                             app.last_touch_x = None
@@ -426,6 +464,11 @@ def main():
                                 app.pos_buffer.clear()
                             except Exception:
                                 pass
+                            # reset long-press
+                            app.long_press_start_time = None
+                            app.long_press_progress = 0.0
+                            app.long_press_target = None
+                            app.long_press_executed = False
                         logging.debug(f'Touch event -> touched={touched}')
                     
                     elif ev[0] == 'POS':
@@ -444,10 +487,53 @@ def main():
                             # Set touch_start on first POS event after press
                             if touched and app.touch_start_x is None:
                                 app.handle_touch_start(bx, by)
+                                # If this is a destructive tab, start long-press timer
+                                if app.TABS[app.active_tab]["id"] in ("reboot", "shutdown"):
+                                    app.long_press_start_time = time.time()
+                                    app.long_press_target = app.active_tab
+                                    app.long_press_progress = 0.0
+                                    app.long_press_executed = False
                             app.last_touch_x = bx
                             app.last_touch_y = by
             
             except queue.Empty:
+                pass
+            # Update long-press progress and handle execution
+            try:
+                now = time.time()
+                if app.long_press_start_time is not None and touched and app.long_press_target == app.active_tab:
+                    # If touch moved too far from start, cancel
+                    if app.touch_start_x is not None and app.last_touch_x is not None:
+                        dx = app.last_touch_x - app.touch_start_x
+                        dy = app.last_touch_y - app.touch_start_y
+                        if (dx * dx + dy * dy) ** 0.5 > 30:
+                            # Movement cancelled long-press
+                            app.long_press_start_time = None
+                            app.long_press_progress = 0.0
+                        else:
+                            dt = now - app.long_press_start_time
+                            prog = max(0.0, min(1.0, dt / app.long_press_duration))
+                            app.long_press_progress = prog
+                            if prog >= 1.0 and not app.long_press_executed:
+                                # Execute action
+                                tabid = app.TABS[app.active_tab]["id"]
+                                logging.info(f"Long-press triggered for {tabid}")
+                                try:
+                                    if tabid == 'reboot':
+                                        subprocess.Popen(['sudo', 'reboot'])
+                                    elif tabid == 'shutdown':
+                                        subprocess.Popen(['sudo', 'poweroff'])
+                                except Exception as e:
+                                    logging.error(f"Failed to execute {tabid}: {e}")
+                                app.long_press_executed = True
+                else:
+                    # Not holding or different tab: ensure progress reset
+                    if not touched:
+                        app.long_press_start_time = None
+                        app.long_press_progress = 0.0
+                        app.long_press_target = None
+                        app.long_press_executed = False
+            except Exception:
                 pass
             
             # Draw and update
