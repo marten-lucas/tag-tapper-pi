@@ -8,8 +8,10 @@ Type=oneshot
 # Using absolute paths avoids unit-file parsing/expansion issues.
 Environment=VLAN_CONFIG=/home/dietpi/tag-tapper-pi/config.yaml
 WorkingDirectory=/home/dietpi/tag-tapper-pi
-ExecStart=/home/dietpi/tag-tapper-pi/networking/sync_vlans.py
+ExecStart=/usr/bin/env python3 /home/dietpi/tag-tapper-pi/networking/sync_vlans.py
 RemainAfterExit=yes
+User=root
+Group=root
 
 [Install]
 WantedBy=multi-user.target
