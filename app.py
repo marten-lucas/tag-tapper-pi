@@ -253,7 +253,8 @@ class TagTapperApp:
         self.indicator_y = self.height - 30
         
         # Fonts
-        self.header_font = pygame.font.Font(None, 28)
+        self.header_font = pygame.font.Font(None, 18)
+        self.tab_title_font = pygame.font.Font(None, 22)
         self.title_font = pygame.font.Font(None, 64)
         self.content_font = pygame.font.Font(None, 40)
         
@@ -281,7 +282,12 @@ class TagTapperApp:
         
         # Active tab
         tab = self.TABS[self.active_tab]
-        
+
+        # Current tab small title line (under header)
+        tab_label = self.tab_title_font.render(self.TABS[self.active_tab]["label"], True, self.TEXT_ACTIVE)
+        tab_label_rect = tab_label.get_rect(center=(self.width // 2, self.header_height + 18))
+        surface.blit(tab_label, tab_label_rect)
+
         # Title at top of content
         title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
         title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
@@ -296,11 +302,6 @@ class TagTapperApp:
                 text_rect = text.get_rect(center=(self.width // 2, y_offset))
                 surface.blit(text, text_rect)
                 y_offset += 50
-        
-        # Swipe hint
-        hint = self.content_font.render("← Swipe →", True, (100, 100, 100))
-        hint_rect = hint.get_rect(center=(self.width // 2, self.height - 70))
-        surface.blit(hint, hint_rect)
         
         # Page indicators at bottom
         total_width = len(self.TABS) * self.indicator_spacing
@@ -398,8 +399,6 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
-                            if app.last_touch_x is not None and app.last_touch_y is not None:
-                                app.handle_touch_start(app.last_touch_x, app.last_touch_y)
                         else:  # Release
                             touched = False
                             if app.touch_start_x is not None and app.last_touch_x is not None:
@@ -416,6 +415,9 @@ def main():
                         if x is not None and y is not None:
                             sx, sy = map_raw_to_screen(x, y, size, calib)
                             logging.debug(f"Touch raw: X={x} Y={y} -> screen: X={sx} Y={sy}")
+                            # Set touch_start on first POS event after press
+                            if touched and app.touch_start_x is None:
+                                app.handle_touch_start(sx, sy)
                             app.last_touch_x = sx
                             app.last_touch_y = sy
             
