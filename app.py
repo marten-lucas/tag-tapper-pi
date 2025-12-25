@@ -6,6 +6,7 @@ import threading
 import queue
 import mmap
 import struct
+import yaml
 
 try:
     import pygame
@@ -112,6 +113,67 @@ class FramebufferWriter:
         self.mm.seek(0)
         self.mm.write(ob)
         # No need to flush every frame; keep performance reasonable
+
+
+def load_touch_calibration(config_file="/home/dietpi/tag-tapper-pi/config.yaml"):
+    """Load calibration values (raw min/max) from YAML config.
+    Falls back to defaults if not present.
+    """
+    try:
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f) or {}
+            calib = config.get('touch_calibration')
+            if calib:
+                return {
+                    'raw_x_min': int(calib.get('raw_x_min', 0)),
+                    'raw_x_max': int(calib.get('raw_x_max', 4095)),
+                    'raw_y_min': int(calib.get('raw_y_min', 0)),
+                    'raw_y_max': int(calib.get('raw_y_max', 4095)),
+                }
+    except Exception as e:
+        logging.info(f"No touch calibration found: {e}")
+    return {
+        'raw_x_min': 0,
+        'raw_x_max': 4095,
+        'raw_y_min': 0,
+        'raw_y_max': 4095,
+    }
+
+
+def map_raw_to_screen(x, y, size, calib):
+    """Map raw touch values to screen pixel coordinates using calibration.
+    Clamps to screen bounds. Handles potential inverted axes.
+    """
+    width, height = size
+    xmin = calib['raw_x_min']
+    xmax = calib['raw_x_max']
+    ymin = calib['raw_y_min']
+    ymax = calib['raw_y_max']
+
+    # Prevent division by zero and handle inverted ranges
+    if xmax == xmin:
+        xr = 1
+    else:
+        xr = xmax - xmin
+    if ymax == ymin:
+        yr = 1
+    else:
+        yr = ymax - ymin
+
+    # Normalize 0..1; invert if needed
+    nx = (x - xmin) / xr
+    ny = (y - ymin) / yr
+    if xr < 0:
+        nx = 1.0 - nx
+    if yr < 0:
+        ny = 1.0 - ny
+
+    # Clamp and scale
+    nx = 0.0 if nx < 0 else 1.0 if nx > 1 else nx
+    ny = 0.0 if ny < 0 else 1.0 if ny > 1 else ny
+    sx = int(nx * (width - 1))
+    sy = int(ny * (height - 1))
+    return sx, sy
 
 
 def touch_thread(devpath, q, stop_event):
@@ -283,38 +345,22 @@ class TagTapperApp:
 
 def main():
     """Main application loop."""
-    # Setup SDL environment for framebuffer
-    os.environ.setdefault('SDL_VIDEODRIVER', 'fbcon')
-    os.environ.setdefault('SDL_FBDEV', '/dev/fb1')
-    os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
-    
+    # Force headless mode: do not attempt to use SDL/fbcon
     size = get_fb_size('/dev/fb1')
-    
-    # Initialize pygame
-    display_initialized = False
-    fbw = None
-    # Initialize modules needed regardless of display
+    fbw = FramebufferWriter('/dev/fb1')
     try:
         pygame.font.init()
     except Exception:
         pass
-
-    try:
-        pygame.display.init()
-        screen = pygame.display.set_mode(size)
-        pygame.mouse.set_visible(False)
-        pygame.display.set_caption('Tag Tapper Pi')
-        display_initialized = True
-    except Exception as e:
-        logging.warning(f"pygame display init failed, switching to headless fb writer: {e}")
-        print(f"WARNING: Failed to initialize pygame display: {e}\nSwitching to headless framebuffer writer.")
-        # Headless mode: draw to a Surface and push to /dev/fb1
-        screen = pygame.Surface(size)
-        fbw = FramebufferWriter('/dev/fb1')
+    screen = pygame.Surface(size)
     
     # Create app
     app = TagTapperApp(size)
     
+    # Load touch calibration
+    calib = load_touch_calibration()
+    logging.info(f"Calibration: X={calib['raw_x_min']}-{calib['raw_x_max']} Y={calib['raw_y_min']}-{calib['raw_y_max']}")
+
     # Start touch monitoring thread
     touch_queue = queue.Queue()
     stop_event = threading.Event()
@@ -329,14 +375,7 @@ def main():
     
     try:
         while running:
-            # Handle pygame events only when a display is available
-            if display_initialized:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        logging.info(f'pygame MOUSEBUTTONDOWN pos={event.pos}')
-                        app.handle_click(event.pos[0], event.pos[1])
+            # No pygame display or events in headless mode
             
             # Process touch queue
             try:
@@ -362,20 +401,18 @@ def main():
                         # Position update
                         _, x, y, p = ev
                         if x is not None and y is not None:
-                            app.last_touch_x = x
-                            app.last_touch_y = y
-                            app.update_hover(x, y)
+                            sx, sy = map_raw_to_screen(x, y, size, calib)
+                            app.last_touch_x = sx
+                            app.last_touch_y = sy
+                            app.update_hover(sx, sy)
             
             except queue.Empty:
                 pass
             
             # Draw and update
             app.draw(screen)
-            if display_initialized:
-                pygame.display.flip()
-            else:
-                # Push buffer to framebuffer
-                fbw.blit_surface(screen)
+            # Push buffer to framebuffer
+            fbw.blit_surface(screen)
             
             clock.tick(30)  # 30 FPS
     
@@ -388,11 +425,10 @@ def main():
             t.join(timeout=1)
         except Exception:
             pass
-        if fbw:
-            try:
-                fbw.close()
-            except Exception:
-                pass
+        try:
+            fbw.close()
+        except Exception:
+            pass
         try:
             pygame.quit()
         except Exception:
