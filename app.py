@@ -316,9 +316,26 @@ class TagTapperApp:
         tab = self.TABS[self.active_tab]
 
         # Title at top of content
-        title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
-        title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
-        surface.blit(title, title_rect)
+        # For reboot/shutdown, replace the big title with a hint/countdown
+        if tab["id"] in ("reboot", "shutdown"):
+            try:
+                import math
+                # If long-press active, show countdown seconds; otherwise show static hint
+                if self.long_press_start_time is not None and self.long_press_target == self.active_tab:
+                    elapsed = time.time() - self.long_press_start_time
+                    remaining = int(max(0, math.ceil(self.long_press_duration - elapsed)))
+                    txt = f"Halten zum Bestätigen: {remaining}s"
+                else:
+                    txt = "5s halten zum Bestätigen"
+                title = self.title_font.render(txt, True, (220, 180, 0))
+                title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
+                surface.blit(title, title_rect)
+            except Exception:
+                pass
+        else:
+            title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
+            title_rect = title.get_rect(center=(self.width // 2, self.header_height + 60))
+            surface.blit(title, title_rect)
         
         # Content in center
         lines = tab["content"].split('\n')
@@ -343,11 +360,11 @@ class TagTapperApp:
 
         # Draw long-press progress for destructive tabs (reboot/shutdown)
         if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
-            # position the progress indicator near center under the large title
+            # position the (larger) progress indicator near center under the big title/hint
             cx = self.width // 2
-            cy = self.header_height + 160
-            radius = 64
-            thickness = 12
+            cy = self.header_height + 190
+            radius = 96
+            thickness = 16
             # Background ring
             pygame.draw.circle(surface, (60, 60, 60), (cx, cy), radius, thickness)
             # Progress arc (start at top)
@@ -360,13 +377,6 @@ class TagTapperApp:
                     pygame.draw.arc(surface, (0, 200, 0), rect, start_angle, end_angle, thickness)
                 except Exception:
                     pass
-            # Subtle hint placed below the progress ring (keeps it free)
-            try:
-                hint = self.header_font.render("5s halten zum Bestätigen", True, (160, 160, 160))
-                hint_rect = hint.get_rect(center=(cx, cy + radius + 22))
-                surface.blit(hint, hint_rect)
-            except Exception:
-                pass
     
     def draw(self, surface):
         """Draw the complete UI."""
