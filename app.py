@@ -427,8 +427,7 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
-                            # record start time and position (if available)
-                            app.touch_start_time = time.time()
+                            # record start position if available
                             if app.last_touch_x is not None:
                                 app.touch_start_x = app.last_touch_x
                                 app.touch_start_y = app.last_touch_y
@@ -443,37 +442,14 @@ def main():
                                 pass
                         else:  # Release
                             touched = False
-                            # Decide gesture by time + movement
-                            nowt = time.time()
-                            start_t = app.touch_start_time or nowt
-                            dt = nowt - start_t
-                            sx = app.touch_start_x
-                            sy = app.touch_start_y
-                            ex = app.last_touch_x
-                            ey = app.last_touch_y
-                            did_swipe = False
-                            try:
-                                if sx is not None and ex is not None:
-                                    dx = ex - sx
-                                    dy = ey - sy if ey is not None and sy is not None else 0
-                                    dist = math.hypot(dx, dy)
-                                    if dist >= app.swipe_distance and dt <= app.swipe_max_time:
-                                        # Treat as swipe
-                                        if app.tabs is not None:
-                                            app.tabs.handle_swipe(sx, ex, app)
-                                        did_swipe = True
-                                    else:
-                                        # Not a swipe: possible tap or long-press (long-press handled elsewhere)
-                                        if dist < app.move_threshold and dt <= app.tap_max_time:
-                                            logging.info('Tap detected')
-                                else:
-                                    # No position samples: treat short press as tap
-                                    if dt <= app.tap_max_time:
-                                        logging.info('Tap detected (no pos)')
-                            except Exception:
-                                pass
-
-                            # Reset touch state
+                            # Use simple position-based swipe detection (no timing constraint)
+                            if app.touch_start_x is not None and app.last_touch_x is not None:
+                                try:
+                                    if app.tabs is not None:
+                                        app.tabs.handle_swipe(app.touch_start_x, app.last_touch_x, app)
+                                except Exception:
+                                    pass
+                            # Reset touch and position buffer
                             app.last_touch_x = None
                             app.last_touch_y = None
                             app.touch_start_x = None
@@ -482,13 +458,12 @@ def main():
                                 app.pos_buffer.clear()
                             except Exception:
                                 pass
-                            # Reset long-press state unless it already executed (keep exec flag if running)
+                            # reset long-press unless it already executed
                             if not app.long_press_executed:
                                 app.long_press_start_time = None
                                 app.long_press_progress = 0.0
                                 app.long_press_target = None
                             else:
-                                # if already executed, clear target but leave progress/exec flags
                                 app.long_press_target = None
                         logging.debug(f'Touch event -> touched={touched}')
                     
