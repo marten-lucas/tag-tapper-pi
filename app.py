@@ -4,6 +4,8 @@ import sys
 import time
 import threading
 import queue
+import mmap
+import struct
 
 try:
     import pygame
@@ -54,6 +56,62 @@ def get_fb_size(fbdev='/dev/fb1'):
     except Exception as e:
         logging.info(f"Couldn't read fb size: {e}")
     return 800, 480
+
+
+class FramebufferWriter:
+    """Minimal direct framebuffer writer for 16bpp (RGB565) devices."""
+    def __init__(self, fbdev='/dev/fb1'):
+        self.fbdev = fbdev
+        self.width, self.height = get_fb_size(fbdev)
+        self.bpp = 16
+        self.line_length = self.width * (self.bpp // 8)
+        self.fb = open(self.fbdev, 'r+b', buffering=0)
+        self.size_bytes = self.line_length * self.height
+        self.mm = mmap.mmap(self.fb.fileno(), self.size_bytes, access=mmap.ACCESS_WRITE)
+        logging.info(f"Opened framebuffer {self.fbdev} for direct writing")
+        logging.info(f"Framebuffer BPP: {self.bpp}")
+
+    def close(self):
+        try:
+            if self.mm:
+                self.mm.flush()
+                self.mm.close()
+        finally:
+            try:
+                self.fb.close()
+            except Exception:
+                pass
+
+    def blit_surface(self, surface):
+        """Copy a pygame Surface to the framebuffer as RGB565.
+
+        Assumes surface size matches framebuffer size.
+        """
+        if surface.get_width() != self.width or surface.get_height() != self.height:
+            # Scale to framebuffer size if needed
+            surface = pygame.transform.smoothscale(surface, (self.width, self.height))
+
+        # Get RGB bytes (24bpp, row-major)
+        rgb_bytes = pygame.image.tostring(surface, 'RGB')
+        # Convert to RGB565 (little-endian) efficiently
+        out = bytearray(self.size_bytes)
+        ib = memoryview(rgb_bytes)
+        ob = memoryview(out)
+        # Process 3-byte RGB to 2-byte 565
+        j = 0
+        for i in range(0, len(ib), 3):
+            r = ib[i]
+            g = ib[i+1]
+            b = ib[i+2]
+            val = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+            ob[j] = val & 0xFF
+            ob[j+1] = (val >> 8) & 0xFF
+            j += 2
+
+        # Write to framebuffer mmap
+        self.mm.seek(0)
+        self.mm.write(ob)
+        # No need to flush every frame; keep performance reasonable
 
 
 def touch_thread(devpath, q, stop_event):
@@ -233,16 +291,26 @@ def main():
     size = get_fb_size('/dev/fb1')
     
     # Initialize pygame
+    display_initialized = False
+    fbw = None
+    # Initialize modules needed regardless of display
+    try:
+        pygame.font.init()
+    except Exception:
+        pass
+
     try:
         pygame.display.init()
         screen = pygame.display.set_mode(size)
         pygame.mouse.set_visible(False)
         pygame.display.set_caption('Tag Tapper Pi')
-        pygame.font.init()
+        display_initialized = True
     except Exception as e:
-        logging.error(f"pygame display init failed: {e}")
-        print(f"ERROR: Failed to initialize pygame display: {e}")
-        sys.exit(1)
+        logging.warning(f"pygame display init failed, switching to headless fb writer: {e}")
+        print(f"WARNING: Failed to initialize pygame display: {e}\nSwitching to headless framebuffer writer.")
+        # Headless mode: draw to a Surface and push to /dev/fb1
+        screen = pygame.Surface(size)
+        fbw = FramebufferWriter('/dev/fb1')
     
     # Create app
     app = TagTapperApp(size)
@@ -261,13 +329,14 @@ def main():
     
     try:
         while running:
-            # Handle pygame events
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    logging.info(f'pygame MOUSEBUTTONDOWN pos={event.pos}')
-                    app.handle_click(event.pos[0], event.pos[1])
+            # Handle pygame events only when a display is available
+            if display_initialized:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        running = False
+                    elif event.type == pygame.MOUSEBUTTONDOWN:
+                        logging.info(f'pygame MOUSEBUTTONDOWN pos={event.pos}')
+                        app.handle_click(event.pos[0], event.pos[1])
             
             # Process touch queue
             try:
@@ -302,7 +371,11 @@ def main():
             
             # Draw and update
             app.draw(screen)
-            pygame.display.flip()
+            if display_initialized:
+                pygame.display.flip()
+            else:
+                # Push buffer to framebuffer
+                fbw.blit_surface(screen)
             
             clock.tick(30)  # 30 FPS
     
@@ -315,7 +388,15 @@ def main():
             t.join(timeout=1)
         except Exception:
             pass
-        pygame.quit()
+        if fbw:
+            try:
+                fbw.close()
+            except Exception:
+                pass
+        try:
+            pygame.quit()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
