@@ -30,7 +30,12 @@ DEFAULT_PREFIX = 24
 
 def run(cmd):
     print('RUN:', ' '.join(cmd))
-    subprocess.check_call(cmd)
+    try:
+        subprocess.check_call(cmd)
+        return 0
+    except subprocess.CalledProcessError as e:
+        print('Command failed:', e)
+        return e.returncode
 
 
 def iface_exists(name):
