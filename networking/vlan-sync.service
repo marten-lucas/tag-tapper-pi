@@ -5,7 +5,7 @@ Wants=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/vlan-sync.sh
+ExecStart=/usr/local/bin/vlan-sync.py
 RemainAfterExit=yes
 
 [Install]

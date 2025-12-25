@@ -29,11 +29,7 @@ chmod +x "$WRAPPER"
 # Copy systemd unit
 cp "$SERVICE_SRC" "$SERVICE_DST"
 
-# Reload systemd and enable service
+# Reload systemd (service will be enabled/started by the installer/update script)
 systemctl daemon-reload
-systemctl enable --now vlan-sync.service || true
 
-# Run once now
-systemctl start --no-block vlan-sync.service || true
-
-echo "VLAN sync service installed and started."
+echo "VLAN sync service installed (unit copied). Enable/start the unit with systemctl if desired."
