@@ -7,6 +7,7 @@ import queue
 import mmap
 import struct
 import yaml
+import numpy as np
 
 try:
     import pygame
@@ -94,24 +95,20 @@ class FramebufferWriter:
 
         # Get RGB bytes (24bpp, row-major)
         rgb_bytes = pygame.image.tostring(surface, 'RGB')
-        # Convert to RGB565 (little-endian) efficiently
-        out = bytearray(self.size_bytes)
-        ib = memoryview(rgb_bytes)
-        ob = memoryview(out)
-        # Process 3-byte RGB to 2-byte 565
-        j = 0
-        for i in range(0, len(ib), 3):
-            r = ib[i]
-            g = ib[i+1]
-            b = ib[i+2]
-            val = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-            ob[j] = val & 0xFF
-            ob[j+1] = (val >> 8) & 0xFF
-            j += 2
-
+        # Convert to RGB565 (little-endian) using NumPy - vectorized, 10-50x faster
+        rgb = np.frombuffer(rgb_bytes, dtype=np.uint8).reshape(self.height, self.width, 3)
+        # Extract channels
+        r = rgb[:, :, 0].astype(np.uint16)
+        g = rgb[:, :, 1].astype(np.uint16)
+        b = rgb[:, :, 2].astype(np.uint16)
+        # Combine to RGB565: RRRRR GGGGGG BBBBB
+        rgb565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+        # Convert to little-endian bytes
+        rgb565_le = rgb565.astype('<u2')
+        
         # Write to framebuffer mmap
         self.mm.seek(0)
-        self.mm.write(ob)
+        self.mm.write(rgb565_le.tobytes())
         # No need to flush every frame; keep performance reasonable
 
 
@@ -222,10 +219,8 @@ class TagTapperApp:
     """Pygame-based TUI with tabs and touch support."""
     
     TABS = [
-        {"id": "ip", "label": "IP", "content": "IP Configuration\n\nComing soon..."},
-        {"id": "ping", "label": "Ping", "content": "Ping Test\n\nComing soon..."},
-        {"id": "range", "label": "Range", "content": "Range Scanner\n\nComing soon..."},
-        {"id": "power", "label": "Power", "content": "Power Options\n\nComing soon..."}
+        {"id": "ip", "label": "Network", "content": "IP Configuration\n\nComing soon..."},
+        {"id": "power", "label": "System", "content": "Power & System\n\nComing soon..."}
     ]
     
     # Colors
