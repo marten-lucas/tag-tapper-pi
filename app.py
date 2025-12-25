@@ -242,7 +242,6 @@ class TagTapperApp:
         self.size = size
         self.width, self.height = size
         self.active_tab = 0
-        self.hover_tab = None
         self.last_touch_x = None
         self.last_touch_y = None
         
@@ -278,9 +277,6 @@ class TagTapperApp:
             if i == self.active_tab:
                 bg_color = self.TAB_ACTIVE_BG
                 text_color = self.TEXT_ACTIVE
-            elif i == self.hover_tab:
-                bg_color = self.TAB_HOVER_BG
-                text_color = self.TEXT_COLOR
             else:
                 bg_color = self.TAB_BG
                 text_color = (170, 170, 170)
@@ -320,27 +316,17 @@ class TagTapperApp:
     
     def handle_click(self, x, y):
         """Handle touch/click event."""
+        logging.info(f"Click at screen coords: X={x} Y={y} (tab_bar: {self.header_height}-{self.header_height + self.tab_bar_height})")
         # Check if click is in tab bar
         if self.header_height <= y < self.header_height + self.tab_bar_height:
             tab_index = x // self.tab_width
             if 0 <= tab_index < len(self.TABS):
-                logging.info(f"Tab clicked: {self.TABS[tab_index]['label']}")
+                logging.info(f"Tab {tab_index} clicked: {self.TABS[tab_index]['label']} (tab_width={self.tab_width})")
                 self.active_tab = tab_index
                 return True
         return False
     
-    def update_hover(self, x, y):
-        """Update hover state based on position."""
-        if x is None or y is None:
-            self.hover_tab = None
-            return
-        
-        if self.header_height <= y < self.header_height + self.tab_bar_height:
-            tab_index = x // self.tab_width
-            if 0 <= tab_index < len(self.TABS):
-                self.hover_tab = tab_index
-                return
-        self.hover_tab = None
+
 
 
 def main():
@@ -402,9 +388,9 @@ def main():
                         _, x, y, p = ev
                         if x is not None and y is not None:
                             sx, sy = map_raw_to_screen(x, y, size, calib)
+                            logging.debug(f"Touch raw: X={x} Y={y} -> screen: X={sx} Y={sy}")
                             app.last_touch_x = sx
                             app.last_touch_y = sy
-                            app.update_hover(sx, sy)
             
             except queue.Empty:
                 pass
