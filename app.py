@@ -239,86 +239,89 @@ class TagTapperApp:
         self.active_tab = 0
         self.last_touch_x = None
         self.last_touch_y = None
+        # Swipe detection
+        self.touch_start_x = None
+        self.touch_start_y = None
         
-        # Layout constants
-        self.header_height = 40
-        self.tab_bar_height = 60
-        self.tab_width = self.width // len(self.TABS)
-        self.content_y = self.header_height + self.tab_bar_height
+        # Layout constants - full screen carousel
+        self.indicator_radius = 8
+        self.indicator_spacing = 24
+        self.indicator_y = self.height - 30
         
         # Fonts
-        self.title_font = pygame.font.Font(None, 36)
-        self.tab_font = pygame.font.Font(None, 32)
-        self.content_font = pygame.font.Font(None, 48)
+        self.title_font = pygame.font.Font(None, 64)
+        self.content_font = pygame.font.Font(None, 40)
         
-    def draw_header(self, surface):
-        """Draw the header bar."""
-        header_rect = pygame.Rect(0, 0, self.width, self.header_height)
-        pygame.draw.rect(surface, self.HEADER_BG, header_rect)
+    def draw_content(self, surface):
+        """Draw the carousel content - full screen."""
+        surface.fill(self.BG_COLOR)
         
-        title = self.title_font.render("Tag Tapper Pi", True, self.TEXT_COLOR)
-        title_rect = title.get_rect(center=(self.width // 2, self.header_height // 2))
+        # Active tab
+        tab = self.TABS[self.active_tab]
+        
+        # Title at top
+        title = self.title_font.render(tab["label"], True, self.TEXT_ACTIVE)
+        title_rect = title.get_rect(center=(self.width // 2, 80))
         surface.blit(title, title_rect)
         
-    def draw_tabs(self, surface):
-        """Draw the tab bar."""
-        tab_y = self.header_height
-        
-        for i, tab in enumerate(self.TABS):
-            x = i * self.tab_width
-            tab_rect = pygame.Rect(x, tab_y, self.tab_width, self.tab_bar_height)
-            
-            # Background color based on state
-            if i == self.active_tab:
-                bg_color = self.TAB_ACTIVE_BG
-                text_color = self.TEXT_ACTIVE
-            else:
-                bg_color = self.TAB_BG
-                text_color = (170, 170, 170)
-            
-            pygame.draw.rect(surface, bg_color, tab_rect)
-            pygame.draw.rect(surface, (50, 50, 50), tab_rect, 1)  # Border
-            
-            # Tab label
-            label = self.tab_font.render(tab["label"], True, text_color)
-            label_rect = label.get_rect(center=tab_rect.center)
-            surface.blit(label, label_rect)
-    
-    def draw_content(self, surface):
-        """Draw the active tab content."""
-        content_rect = pygame.Rect(0, self.content_y, self.width, 
-                                   self.height - self.content_y)
-        pygame.draw.rect(surface, self.BG_COLOR, content_rect)
-        
-        # Draw content text
-        tab = self.TABS[self.active_tab]
+        # Content in center
         lines = tab["content"].split('\n')
-        
-        y_offset = self.content_y + 60
+        y_offset = 160
         for line in lines:
             if line.strip():
-                text = self.content_font.render(line, True, self.TEXT_ACTIVE)
+                text = self.content_font.render(line, True, (200, 200, 200))
                 text_rect = text.get_rect(center=(self.width // 2, y_offset))
                 surface.blit(text, text_rect)
-                y_offset += 60
+                y_offset += 50
+        
+        # Swipe hint
+        hint = self.content_font.render("← Swipe →", True, (100, 100, 100))
+        hint_rect = hint.get_rect(center=(self.width // 2, self.height - 70))
+        surface.blit(hint, hint_rect)
+        
+        # Page indicators at bottom
+        total_width = len(self.TABS) * self.indicator_spacing
+        start_x = (self.width - total_width) // 2 + self.indicator_radius
+        
+        for i in range(len(self.TABS)):
+            x = start_x + i * self.indicator_spacing
+            if i == self.active_tab:
+                pygame.draw.circle(surface, self.TEXT_ACTIVE, (x, self.indicator_y), self.indicator_radius)
+            else:
+                pygame.draw.circle(surface, (80, 80, 80), (x, self.indicator_y), self.indicator_radius, 2)
     
     def draw(self, surface):
         """Draw the complete UI."""
-        surface.fill(self.BG_COLOR)
-        self.draw_header(surface)
-        self.draw_tabs(surface)
         self.draw_content(surface)
     
-    def handle_click(self, x, y):
-        """Handle touch/click event."""
-        logging.info(f"Click at screen coords: X={x} Y={y} (tab_bar: {self.header_height}-{self.header_height + self.tab_bar_height})")
-        # Check if click is in tab bar
-        if self.header_height <= y < self.header_height + self.tab_bar_height:
-            tab_index = x // self.tab_width
-            if 0 <= tab_index < len(self.TABS):
-                logging.info(f"Tab {tab_index} clicked: {self.TABS[tab_index]['label']} (tab_width={self.tab_width})")
-                self.active_tab = tab_index
-                return True
+    def handle_touch_start(self, x, y):
+        """Record touch start position for swipe detection."""
+        self.touch_start_x = x
+        self.touch_start_y = y
+        logging.debug(f"Touch start: X={x} Y={y}")
+    
+    def handle_swipe(self, start_x, end_x):
+        """Detect and handle swipe gestures."""
+        if start_x is None or end_x is None:
+            return False
+        
+        delta_x = end_x - start_x
+        threshold = 60  # Minimum swipe distance in pixels
+        
+        logging.info(f"Swipe: start_x={start_x} end_x={end_x} delta={delta_x}")
+        
+        if abs(delta_x) > threshold:
+            if delta_x > 0:  # Swipe right → previous tab
+                if self.active_tab > 0:
+                    self.active_tab -= 1
+                    logging.info(f"Swipe RIGHT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
+                    return True
+            else:  # Swipe left → next tab
+                if self.active_tab < len(self.TABS) - 1:
+                    self.active_tab += 1
+                    logging.info(f"Swipe LEFT → Tab {self.active_tab}: {self.TABS[self.active_tab]['label']}")
+                    return True
+        
         return False
     
 
@@ -371,12 +374,16 @@ def main():
                         if val == 1:  # Press
                             touched = True
                             if app.last_touch_x is not None and app.last_touch_y is not None:
-                                app.handle_click(app.last_touch_x, app.last_touch_y)
+                                app.handle_touch_start(app.last_touch_x, app.last_touch_y)
                         else:  # Release
                             touched = False
+                            if app.touch_start_x is not None and app.last_touch_x is not None:
+                                app.handle_swipe(app.touch_start_x, app.last_touch_x)
                             app.last_touch_x = None
                             app.last_touch_y = None
-                        logging.info(f'Touch event -> touched={touched}')
+                            app.touch_start_x = None
+                            app.touch_start_y = None
+                        logging.debug(f'Touch event -> touched={touched}')
                     
                     elif ev[0] == 'POS':
                         # Position update
