@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import time
-import math
 import threading
 import queue
 import mmap
@@ -298,12 +297,7 @@ class TagTapperApp:
         self.exec_after_anim = None
         self.anim_start = None
         self.anim_duration = 1.0  # seconds for pre-exec animation
-        # Gesture timing and thresholds
-        self.touch_start_time = None
-        self.move_threshold = 30        # px, movement that cancels long-press
-        self.swipe_distance = 50        # px, min distance for swipe
-        self.swipe_max_time = 0.5       # s, max time to consider a fast swipe
-        self.tap_max_time = 0.2         # s, max time for a tap
+        
         
     
     
@@ -502,7 +496,7 @@ def main():
                     if app.touch_start_x is not None and app.last_touch_x is not None:
                         dx = app.last_touch_x - app.touch_start_x
                         dy = app.last_touch_y - app.touch_start_y
-                        if (dx * dx + dy * dy) ** 0.5 > app.move_threshold:
+                        if (dx * dx + dy * dy) ** 0.5 > 30:
                             # Movement cancelled long-press
                             app.long_press_start_time = None
                             app.long_press_progress = 0.0
