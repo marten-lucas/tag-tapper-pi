@@ -13,9 +13,14 @@ class Tabs:
         """Render header (title) and indicators. Returns a content_rect for tabs to draw into.
         """
         w, h = app.width, app.height
-        # Header
+        # Header (app bar) - stronger contrast vs table headers
         header_rect = pygame.Rect(0, 0, w, self.header_height)
         pygame.draw.rect(surface, styles.HEADER_BG, header_rect)
+        # Add a bottom border line to differentiate from content/table headers
+        try:
+            pygame.draw.line(surface, styles.ACCENT_COLOR, (0, self.header_height - 1), (w, self.header_height - 1), 2)
+        except Exception:
+            pass
 
         # Title centered
         try:

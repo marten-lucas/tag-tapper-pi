@@ -19,7 +19,7 @@ pings:
   name: Google DNS
 range_scanner:
   interface: wlan0
-  update_interval: 5
+  update_interval: 2
   ssid:
     - name: "Spezialgelagertes Sonder-WLAN"
     - name: "Kita Gramschatz"

@@ -1,22 +1,22 @@
 import pygame
 
-# Color palette
-BG_COLOR = (0, 0, 0)
-HEADER_BG = (0, 51, 102)
-TAB_BG = (0, 34, 68)
-TAB_ACTIVE_BG = (0, 68, 136)
-TAB_HOVER_BG = (0, 51, 102)
+# Color palette (friendly theme)
+BG_COLOR = (0, 0, 0)                 # 000000 background
+HEADER_BG = (11, 124, 141)           # 0B7C8D app bar
+TAB_BG = (26, 166, 157)              # 1AA69D table header
+TAB_ACTIVE_BG = (20, 133, 126)       # darker variant of 1AA69D
+TAB_HOVER_BG = (16, 110, 104)        # darker variant
 TEXT_COLOR = (255, 255, 255)
-TEXT_ACTIVE = (0, 255, 0)
-BORDER_COLOR = (0, 255, 0)
+TEXT_ACTIVE = (237, 154, 23)         # accent for active labels
+BORDER_COLOR = (26, 166, 157)        # border accents
 
 # Additional common colors used across UI
-ACCENT_COLOR = (255, 200, 0)       # for highlights, animations, accents
-MUTED_TEXT = (200, 200, 200)       # for secondary text like IPs
-OK_COLOR = (0, 200, 0)            # positive status (green dot)
-ERROR_COLOR = (200, 60, 60)       # negative status (red X)
-NEUTRAL_RING = (60, 60, 60)       # ring/background for action tab
-INACTIVE_INDICATOR = (80, 80, 80) # indicator circle when inactive
+ACCENT_COLOR = (237, 154, 23)        # ED9A17 for highlights/animations/mid-range
+MUTED_TEXT = (200, 200, 200)         # secondary text like IPs
+OK_COLOR = (48, 155, 64)             # 309B40 success (green dot)
+ERROR_COLOR = (225, 85, 20)          # E15514 error (red/orange)
+NEUTRAL_RING = (60, 60, 60)          # ring/background for action tab
+INACTIVE_INDICATOR = (120, 120, 120) # indicator circle when inactive
 
 # Font sizes
 HEADER_FONT_SIZE = 22
