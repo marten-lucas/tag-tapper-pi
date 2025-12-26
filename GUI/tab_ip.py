@@ -4,6 +4,10 @@ import subprocess
 import threading
 import time
 try:
+    import pygame
+except Exception:
+    pygame = None
+try:
     import yaml
 except Exception:
     yaml = None
