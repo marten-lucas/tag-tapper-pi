@@ -20,28 +20,26 @@ class TabIP:
         self.cached_ips = {}
         self.cached_up = {}
         self.cached_vlan_names = {}
+        self.poll_interval = 2  # seconds between refreshes
+        # Track previous state for change detection
+        self.prev_up = {}
+        # Toast message system
+        self.toast_message = None
+        self.toast_time = 0
         # populate initial cache
         self.refresh_cache()
-        # start monitor thread
-        t = threading.Thread(target=self._monitor_loop, daemon=True)
-        t.start()
+        # start polling thread for reliable updates
+        p = threading.Thread(target=self._poll_loop, daemon=True)
+        p.start()
 
-    def _monitor_loop(self):
-        # Use `ip monitor all` to get netlink events without extra deps
+    def _poll_loop(self):
+        """Periodic fallback refresh to catch state changes if monitor misses events."""
         while True:
             try:
-                p = subprocess.Popen(['ip', 'monitor', 'all'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-                # read lines and refresh cache on any event
-                while True:
-                    line = p.stdout.readline()
-                    if not line:
-                        break
-                    # On any event, refresh cache
-                    self.refresh_cache()
-                # process ended unexpectedly; retry after short sleep
-                time.sleep(1)
+                self.refresh_cache()
             except Exception:
-                time.sleep(2)
+                pass
+            time.sleep(self.poll_interval)
 
     def refresh_cache(self):
         try:
@@ -54,6 +52,21 @@ class TabIP:
         for iface in ifaces:
             ips[iface] = self.get_ip_for_iface(iface)
             ups[iface] = self.iface_is_up(iface)
+        
+        # Detect state changes and generate toast messages
+        for iface in ups:
+            if iface not in self.prev_up:
+                # New interface detected (first time)
+                self.prev_up[iface] = ups[iface]
+            elif self.prev_up[iface] != ups[iface]:
+                # State changed
+                if ups[iface]:
+                    # Interface came UP
+                    self.toast_message = f"{iface} verbunden"
+                    self.toast_time = time.time()
+                # else: interface went down, no toast (noisy)
+                self.prev_up[iface] = ups[iface]
+        
         with self._lock:
             self.cached_ifaces = ifaces
             self.cached_ips = ips
@@ -215,3 +228,26 @@ class TabIP:
                     pygame.draw.line(surface, color, (cx - s, cy + s), (cx + s, cy - s), 2)
                 except Exception:
                     pass
+
+        # Render toast message if active
+        if self.toast_message:
+            elapsed = time.time() - self.toast_time
+            if elapsed < 3:  # Show for 3 seconds
+                try:
+                    toast_font = fonts.get('content', table_font)
+                    toast_text = toast_font.render(self.toast_message, True, styles.OK_COLOR)
+                    toast_rect = toast_text.get_rect()
+                    toast_x = rect.centerx - toast_rect.width // 2
+                    toast_y = rect.bottom - 60
+                    # Draw semi-transparent background
+                    bg_rect = pygame.Rect(toast_x - 12, toast_y - 4, toast_rect.width + 24, toast_rect.height + 8)
+                    toast_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+                    toast_surface.set_alpha(200)
+                    toast_surface.fill((20, 20, 20))
+                    surface.blit(toast_surface, bg_rect.topleft)
+                    # Draw text
+                    surface.blit(toast_text, (toast_x, toast_y))
+                except Exception:
+                    pass
+            else:
+                self.toast_message = None
