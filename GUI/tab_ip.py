@@ -141,13 +141,18 @@ class TabIP:
         ip_x = rect.right - 220
         status_x = rect.right - 60
 
-        # Header row
+        # Header background to visually separate header from content
+        header_bg_rect = pygame.Rect(name_x - 16, rect.top + 12, rect.width - 40, row_h + 6)
+        try:
+            pygame.draw.rect(surface, styles.TAB_BG, header_bg_rect)
+        except Exception:
+            pygame.draw.rect(surface, (40, 40, 40), header_bg_rect)
+
+        # Header row (no 'OK' label per request)
         hdr_name = table_font.render('Schnittstelle', True, styles.TEXT_COLOR)
         hdr_ip = table_font.render('IP', True, styles.TEXT_COLOR)
-        hdr_status = table_font.render('OK', True, styles.TEXT_COLOR)
         surface.blit(hdr_name, (name_x, rect.top + 18))
         surface.blit(hdr_ip, (ip_x, rect.top + 18))
-        surface.blit(hdr_status, (status_x - 6, rect.top + 18))
 
         # Rows
         for i, iface in enumerate(candidates):
@@ -166,11 +171,21 @@ class TabIP:
             ip_text = ip if ip else '-'
             ip_s = table_font.render(ip_text, True, (200, 200, 200))
             surface.blit(ip_s, (ip_x, y))
+            # Draw status icon: green filled circle if up+ip, otherwise red X
             if up and ip:
-                sym = '✓'
-                color = styles.TEXT_ACTIVE
+                # green dot
+                try:
+                    pygame.draw.circle(surface, styles.TEXT_ACTIVE, (status_x, y + row_h // 2), row_h // 3)
+                except Exception:
+                    pygame.draw.circle(surface, (0, 200, 0), (status_x, y + row_h // 2), row_h // 3)
             else:
-                sym = '✗'
-                color = (200, 60, 60)
-            sym_s = table_font.render(sym, True, color)
-            surface.blit(sym_s, sym_s.get_rect(center=(status_x, y + row_h // 2)))
+                # red 'X'
+                cx = status_x
+                cy = y + row_h // 2
+                s = row_h // 3
+                try:
+                    color = (200, 60, 60)
+                    pygame.draw.line(surface, color, (cx - s, cy - s), (cx + s, cy + s), 2)
+                    pygame.draw.line(surface, color, (cx - s, cy + s), (cx + s, cy - s), 2)
+                except Exception:
+                    pass

@@ -242,6 +242,8 @@ class TagTapperApp:
         self.long_press_start_time = None
         self.long_press_target = None
         self.long_press_duration = 5.0  # seconds to trigger action
+        # Suppress a release-triggered tab change immediately after a long-press
+        self.suppress_next_release = False
         self.long_press_progress = 0.0
         self.long_press_executed = False
         # Animation state for pre-execution
@@ -375,6 +377,8 @@ def main():
                                     app.long_press_target = app.active_tab
                                     app.long_press_progress = 0.0
                                     app.long_press_executed = False
+                                    app.suppress_next_release = False
+                                    logging.info(f"Long-press START for tab {app.TABS[app.active_tab]['id']}")
                             except Exception:
                                 pass
                         else:  # Release
@@ -389,6 +393,8 @@ def main():
                                     was_hold = True
                                 elif app.exec_after_anim is not None:
                                     was_hold = True
+                                elif getattr(app, 'suppress_next_release', False):
+                                    was_hold = True
                             except Exception:
                                 was_hold = False
 
@@ -397,6 +403,12 @@ def main():
                                 try:
                                     app.active_tab = (app.active_tab + 1) % len(app.TABS)
                                     logging.info(f"Touch released -> next tab: {app.TABS[app.active_tab]['label']}")
+                                except Exception:
+                                    pass
+                            else:
+                                # consume and clear suppression so next releases behave normally
+                                try:
+                                    app.suppress_next_release = False
                                 except Exception:
                                     pass
                             # Reset touch and position buffer
@@ -445,6 +457,11 @@ def main():
                         app.exec_after_anim = tabid
                         app.anim_start = now
                         app.long_press_executed = True
+                        # suppress the immediate subsequent release-driven tab change
+                        try:
+                            app.suppress_next_release = True
+                        except Exception:
+                            pass
                 else:
                     # Not holding or different tab: ensure progress reset
                     if not touched:
