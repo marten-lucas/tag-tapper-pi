@@ -13,14 +13,7 @@ class Tabs:
         """Render header (title) and indicators. Returns a content_rect for tabs to draw into.
         """
         w, h = app.width, app.height
-        # Header (app bar) - stronger contrast vs table headers
-        header_rect = pygame.Rect(0, 0, w, self.header_height)
-        pygame.draw.rect(surface, styles.HEADER_BG, header_rect)
-        # Add a bottom border line to differentiate from content/table headers
-        try:
-            pygame.draw.line(surface, styles.ACCENT_COLOR, (0, self.header_height - 1), (w, self.header_height - 1), 2)
-        except Exception:
-            pass
+        # Header (app bar) with no background; only text elements
 
         # Title centered
         try:
@@ -37,7 +30,7 @@ class Tabs:
             pass
 
         # Left app name
-        title = fonts['header'].render('Tag Tapper Pi', True, styles.TEXT_COLOR)
+        title = fonts['header'].render('Tag Tapper Pi', True, styles.MUTED_TEXT)
         surface.blit(title, (10, (self.header_height - title.get_height()) // 2))
 
         # Date/time right
@@ -45,7 +38,7 @@ class Tabs:
             import datetime
             now = datetime.datetime.now()
             time_str = now.strftime('%d.%m.%Y %H:%M')
-            time_text = fonts['header'].render(time_str, True, styles.TEXT_COLOR)
+            time_text = fonts['header'].render(time_str, True, styles.MUTED_TEXT)
             surface.blit(time_text, (w - time_text.get_width() - 10, (self.header_height - time_text.get_height()) // 2))
         except Exception:
             pass

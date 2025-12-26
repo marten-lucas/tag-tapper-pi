@@ -2,8 +2,8 @@ import pygame
 
 # Color palette (friendly theme)
 BG_COLOR = (0, 0, 0)                 # 000000 background
-HEADER_BG = (11, 124, 141)           # 0B7C8D app bar
-TAB_BG = (26, 166, 157)              # 1AA69D table header
+HEADER_BG = (11, 124, 141)           # 0B7C8D (kept for reference)
+TAB_BG = (11, 124, 141)              # Use former app bar color for table header
 TAB_ACTIVE_BG = (20, 133, 126)       # darker variant of 1AA69D
 TAB_HOVER_BG = (16, 110, 104)        # darker variant
 TEXT_COLOR = (255, 255, 255)
