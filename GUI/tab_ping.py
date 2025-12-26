@@ -45,15 +45,25 @@ class TabPing:
             with open(cfg_path, 'r') as f:
                 cfg = yaml.safe_load(f) or {}
             
-            # Build interface list: eth0, VLANs, wlan0
+            # Build interface list: eth0, VLANs, then wlan*
             interfaces.append('eth0')
             
             for v in cfg.get('vlans', []):
                 vid = str(v.get('id'))
                 interfaces.append(f"eth0.{vid}")
             
-            wifi_iface = cfg.get('wifi', {}).get('interface', 'wlan0')
-            interfaces.append(wifi_iface)
+            # Add wlan interfaces dynamically (like in tab_ip.py)
+            try:
+                out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
+                for line in out.splitlines():
+                    parts = line.split(':', 2)
+                    if len(parts) >= 2:
+                        iface = parts[1].strip().split('@')[0]
+                        if iface.startswith('wlan') or iface.startswith('wl'):
+                            if iface not in interfaces:
+                                interfaces.append(iface)
+            except Exception:
+                pass
             
             # Get ping targets
             for p in cfg.get('pings', []):
@@ -206,6 +216,10 @@ class TabPing:
             elapsed = time.time() - last_update
             if elapsed < 3:
                 # Show "Updated" message for 3 seconds after update
-                update_msg = table_font.render("✓ Aktualisiert", True, styles.OK_COLOR)
-                update_rect = update_msg.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
-                surface.blit(update_msg, update_rect)
+                # Use simple text (no Unicode check mark as bitmap font doesn't support it)
+                try:
+                    update_msg = table_font.render("-- Aktualisiert --", True, styles.OK_COLOR)
+                    update_rect = update_msg.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
+                    surface.blit(update_msg, update_rect)
+                except Exception:
+                    pass

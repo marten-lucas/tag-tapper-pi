@@ -17,6 +17,10 @@ pings:
 
 - host: 8.8.8.8
   name: Google DNS
-wifi:
+range_scanner:
   interface: wlan0
   update_interval: 5
+  ssid:
+    - name: "Spezialgelagertes Sonder-WLAN"
+    - name: "Kita Gramschatz"
+      
