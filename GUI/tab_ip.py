@@ -158,7 +158,10 @@ class TabIP:
         try:
             pygame.draw.rect(surface, styles.TAB_BG, header_bg_rect)
         except Exception:
-            pygame.draw.rect(surface, (40, 40, 40), header_bg_rect)
+            try:
+                pygame.draw.rect(surface, styles.NEUTRAL_RING, header_bg_rect)
+            except Exception:
+                pass
 
         # Header row (no 'OK' label per request)
         hdr_name = table_font.render('Schnittstelle', True, styles.TEXT_COLOR)
@@ -189,22 +192,25 @@ class TabIP:
             surface.blit(name_s, (name_x, y))
             # Only show IP if interface is UP and has an IP
             ip_text = ip if (ip and up) else '-'
-            ip_s = table_font.render(ip_text, True, (200, 200, 200))
+            ip_s = table_font.render(ip_text, True, styles.MUTED_TEXT)
             surface.blit(ip_s, (ip_x, y))
             # Draw status icon: green filled circle if up+ip, otherwise red X
             if up and ip:
                 # green dot
                 try:
-                    pygame.draw.circle(surface, styles.TEXT_ACTIVE, (status_x, y + row_h // 2), row_h // 3)
+                    pygame.draw.circle(surface, styles.OK_COLOR, (status_x, y + row_h // 2), row_h // 3)
                 except Exception:
-                    pygame.draw.circle(surface, (0, 200, 0), (status_x, y + row_h // 2), row_h // 3)
+                    try:
+                        pygame.draw.circle(surface, styles.OK_COLOR, (status_x, y + row_h // 2), row_h // 3)
+                    except Exception:
+                        pass
             else:
                 # red 'X'
                 cx = status_x
                 cy = y + row_h // 2
                 s = row_h // 3
                 try:
-                    color = (200, 60, 60)
+                    color = styles.ERROR_COLOR
                     pygame.draw.line(surface, color, (cx - s, cy - s), (cx + s, cy + s), 2)
                     pygame.draw.line(surface, color, (cx - s, cy + s), (cx + s, cy - s), 2)
                 except Exception:

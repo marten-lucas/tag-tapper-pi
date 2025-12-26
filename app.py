@@ -187,15 +187,7 @@ class TagTapperApp:
         {"id": "shutdown", "label": "Shutdown"}
     ]
     
-    # Colors
-    BG_COLOR = (0, 0, 0)
-    HEADER_BG = (0, 51, 102)
-    TAB_BG = (0, 34, 68)
-    TAB_ACTIVE_BG = (0, 68, 136)
-    TAB_HOVER_BG = (0, 51, 102)
-    TEXT_COLOR = (255, 255, 255)
-    TEXT_ACTIVE = (0, 255, 0)
-    BORDER_COLOR = (0, 255, 0)
+    # Color constants were moved to GUI/styles.py
     
     def __init__(self, size):
         self.size = size
@@ -308,10 +300,10 @@ class TagTapperApp:
             start_angle = -math.pi / 2
             end_angle = start_angle + (t * 2 * math.pi)
             rect = pygame.Rect(cx - radius, cy - radius, radius * 2, radius * 2)
-            pygame.draw.arc(surface, (255, 200, 0), rect, start_angle, end_angle, thickness)
+            pygame.draw.arc(surface, styles.ACCENT_COLOR, rect, start_angle, end_angle, thickness)
 
             # Text "Executing..."
-            txt = self.content_font.render("Executing…", True, (255, 200, 0))
+            txt = self.content_font.render("Executing…", True, styles.ACCENT_COLOR)
             rtxt = txt.get_rect(center=(cx, cy + radius + 30))
             surface.blit(txt, rtxt)
         except Exception:

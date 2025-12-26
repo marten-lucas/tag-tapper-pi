@@ -54,7 +54,7 @@ class Tabs:
             if i == app.active_tab:
                 pygame.draw.circle(surface, styles.TEXT_ACTIVE, (x, indicator_y), self.indicator_radius)
             else:
-                pygame.draw.circle(surface, (80, 80, 80), (x, indicator_y), self.indicator_radius, 2)
+                pygame.draw.circle(surface, styles.INACTIVE_INDICATOR, (x, indicator_y), self.indicator_radius, 2)
 
         # Return content rect that avoids header and indicators
         content_top = self.header_height
