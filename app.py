@@ -19,11 +19,7 @@ except Exception as e:
     print("pygame is required. Install with: pip3 install pygame")
     sys.exit(1)
 
-try:
-    from evdev import InputDevice, ecodes
-except Exception as e:
-    print("evdev is required. Install with: pip3 install evdev")
-    sys.exit(1)
+# Touch handling delegated to tagtapperpi_comp/touch.py which uses python-evdev
 
 TOUCH_PATH = "/dev/input/by-path/platform-3f204000.spi-cs-1-event"
 LOG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tag-tapper-pi.log")
@@ -177,46 +173,7 @@ def map_raw_to_screen(x, y, size, calib):
     return sx, sy
 
 
-def touch_thread(devpath, q, stop_event):
-    """Thread to read touch events from evdev and push to queue."""
-    try:
-        d = InputDevice(devpath)
-        logging.info(f"Opened touch device {devpath} ({d.name})")
-        cur_x = None
-        cur_y = None
-        cur_pressure = 0
-        for ev in d.read_loop():
-            if stop_event.is_set():
-                break
-            try:
-                t = ev.type
-                c = ev.code
-                v = ev.value
-                tname = ecodes.EV.get(t, str(t))
-                cname = ecodes.bytype.get(t, {}).get(c, c)
-            except Exception:
-                tname = ev.type
-                cname = ev.code
-                v = ev.value
 
-            logging.debug('evdev: type=%s code=%s value=%s', tname, cname, v)
-
-            try:
-                if ev.type == ecodes.EV_ABS:
-                    if ev.code in (ecodes.ABS_X, ecodes.ABS_MT_POSITION_X):
-                        cur_x = ev.value
-                    elif ev.code in (ecodes.ABS_Y, ecodes.ABS_MT_POSITION_Y):
-                        cur_y = ev.value
-                    elif ev.code == ecodes.ABS_PRESSURE:
-                        cur_pressure = ev.value
-                elif ev.type == ecodes.EV_KEY and ev.code == ecodes.BTN_TOUCH:
-                    q.put(('BTN', ev.value))
-                elif ev.type == ecodes.EV_SYN and ev.code == ecodes.SYN_REPORT:
-                    q.put(('POS', cur_x, cur_y, cur_pressure))
-            except Exception:
-                pass
-    except Exception as e:
-        logging.error(f"touch thread error: {e}")
 
 
 class TagTapperApp:
@@ -393,11 +350,15 @@ def main():
     calib = load_touch_calibration()
     logging.info(f"Calibration: X={calib['raw_x_min']}-{calib['raw_x_max']} Y={calib['raw_y_min']}-{calib['raw_y_max']}")
 
-    # Start touch monitoring thread
+    # Start touch monitoring thread (delegated to tagtapperpi_comp.touch)
     touch_queue = queue.Queue()
     stop_event = threading.Event()
-    t = threading.Thread(target=touch_thread, args=(TOUCH_PATH, touch_queue, stop_event), daemon=True)
-    t.start()
+    t = None
+    try:
+        from tagtapperpi_comp import touch as touch_module
+        t = touch_module.start_touch_monitor(touch_queue, TOUCH_PATH, stop_event)
+    except Exception as e:
+        logging.error(f"Failed to start touch monitor: {e}")
     
     logging.info('App started. Starting main loop...')
     
@@ -427,7 +388,7 @@ def main():
                                 app.touch_start_y = app.last_touch_y
                             # Start long-press immediately for destructive tabs (position-independent)
                             try:
-                                if self.TABS[self.active_tab]["id"] in ("reboot", "shutdown"):
+                                if app.TABS[app.active_tab]["id"] in ("reboot", "shutdown"):
                                     app.long_press_start_time = time.time()
                                     app.long_press_target = app.active_tab
                                     app.long_press_progress = 0.0

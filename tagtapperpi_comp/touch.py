@@ -7,6 +7,11 @@ import yaml
 
 try:
     from textual.events import Click
+    try:
+        from evdev import InputDevice, ecodes
+    except Exception:
+        InputDevice = None
+        ecodes = None
 except ImportError:
     Click = None
 
@@ -40,85 +45,57 @@ def load_calibration(config_file="/home/dietpi/tag-tapper-pi/config.yaml"):
     }
 
 
-def start_touch_monitor(app, device_path: str, poll_size: int = 24, debounce: float = 0.3):
-    """Start a background thread that reads raw kernel input from `device_path`.
-    
-    Extracts touch coordinates and posts MouseDown events to the app.
+def start_touch_monitor(q, device_path: str, stop_event=None):
+    """Start a background thread that reads events from device_path using python-evdev.
+
+    Emits to `q` the same tuples as the original implementation:
+      - ('BTN', value)
+      - ('POS', x, y, pressure)
+
+    Returns the started Thread. `stop_event` may be a threading.Event to stop the loop.
     """
 
     def _monitor():
         logger = logging.getLogger("tagtapper.touch")
-        
-        # Load calibration
         calib = load_calibration()
         logger.info(f"Touch calibration loaded: raw_x={calib['raw_x_min']}-{calib['raw_x_max']}, raw_y={calib['raw_y_min']}-{calib['raw_y_max']}")
-        
-        try:
-            if not os.path.exists(device_path):
-                logger.error(f"Device nicht gefunden: {device_path}")
-                return
 
-            with open(device_path, "rb") as f:
-                logger.info(f"Touch-Monitor verbunden mit {device_path}")
-                
-                # Track latest touch coordinates
-                touch_x = None
-                touch_y = None
-                touch_pressed = False
-                
-                while True:
-                    data = f.read(poll_size)
-                    if data and len(data) >= 24:
-                        try:
-                            # Parse Linux input_event: sec, usec, type, code, value
-                            sec, usec, etype, code, value = struct.unpack("llHHi", data[:24])
-                            
-                            # EV_ABS (type 3): Absolute coordinates
-                            if etype == 3:
-                                if code == 0:  # ABS_X
-                                    # Apply calibration mapping
-                                    raw_range = calib['raw_x_max'] - calib['raw_x_min']
-                                    if raw_range > 0:
-                                        normalized = (value - calib['raw_x_min']) / raw_range
-                                        touch_x = int(max(0, min(1, normalized)) * (calib['screen_width'] - 1))
-                                    else:
-                                        touch_x = int((value / 4095.0) * (calib['screen_width'] - 1))
-                                        
-                                elif code == 1:  # ABS_Y
-                                    # Apply calibration mapping
-                                    raw_range = calib['raw_y_max'] - calib['raw_y_min']
-                                    if raw_range > 0:
-                                        normalized = (value - calib['raw_y_min']) / raw_range
-                                        touch_y = int(max(0, min(1, normalized)) * (calib['screen_height'] - 1))
-                                    else:
-                                        touch_y = int((value / 4095.0) * (calib['screen_height'] - 1))
-                            
-                            # EV_KEY (type 1): Button press/release
-                            elif etype == 1 and code == 330:  # BTN_TOUCH
-                                if value == 1 and not touch_pressed:  # Press
-                                    touch_pressed = True
-                                    if touch_x is not None and touch_y is not None:
-                                        # Post Click event with calibrated coordinates
-                                        try:
-                                            app.call_from_thread(_post_click, app, touch_x, touch_y)
-                                            logger.info(f"Touch at X={touch_x} Y={touch_y}")
-                                        except Exception as e:
-                                            logger.error(f"Failed to post click event: {e}")
-                                elif value == 0:  # Release
-                                    touch_pressed = False
-                            
-                            # EV_SYN (type 0): Sync event marks end of event packet
-                            elif etype == 0 and code == 0:
-                                pass  # Sync - ignore
-                                
-                        except struct.error as e:
-                            logger.debug(f"Parse error: {e}")
-                            
-                    # Small delay to avoid CPU overload
-                    time.sleep(0.01)
-                    
+        if InputDevice is None:
+            logger.error('python-evdev not available; cannot monitor touch device')
+            return
+
+        try:
+            dev = InputDevice(device_path)
+            logger.info(f"Opened touch device {device_path} ({dev.name})")
         except Exception as e:
-            logger.error(f"Kritischer Fehler im Touch-Monitor: {e}")
+            logger.error(f"Failed to open touch device {device_path}: {e}")
+            return
+
+        cur_x = None
+        cur_y = None
+        cur_pressure = 0
+
+        try:
+            for ev in dev.read_loop():
+                if stop_event is not None and stop_event.is_set():
+                    break
+                try:
+                    if ev.type == ecodes.EV_ABS:
+                        if ev.code in (ecodes.ABS_X, ecodes.ABS_MT_POSITION_X):
+                            cur_x = ev.value
+                        elif ev.code in (ecodes.ABS_Y, ecodes.ABS_MT_POSITION_Y):
+                            cur_y = ev.value
+                        elif ev.code == ecodes.ABS_PRESSURE:
+                            cur_pressure = ev.value
+                    elif ev.type == ecodes.EV_KEY and ev.code == ecodes.BTN_TOUCH:
+                        q.put(('BTN', ev.value))
+                    elif ev.type == ecodes.EV_SYN:
+                        # On SYN_REPORT, push current position
+                        q.put(('POS', cur_x, cur_y, cur_pressure))
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.error(f"Touch monitor loop error: {e}")
 
     thread = threading.Thread(target=_monitor, daemon=True)
     thread.start()
