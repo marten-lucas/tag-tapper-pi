@@ -203,9 +203,6 @@ class TagTapperApp:
         self.active_tab = 0
         self.last_touch_x = None
         self.last_touch_y = None
-        # Swipe detection
-        self.touch_start_x = None
-        self.touch_start_y = None
         
         # Layout constants - header + carousel
         self.header_height = 35
@@ -241,9 +238,6 @@ class TagTapperApp:
 
         # Position smoothing buffer for touch POS events
         self.pos_buffer = deque(maxlen=4)
-        # Swipe debounce control
-        self.last_swipe_time = 0.0
-        self.swipe_debounce = 0.2  # seconds
         # Long-press (hold) control for destructive actions
         self.long_press_start_time = None
         self.long_press_target = None
@@ -289,14 +283,6 @@ class TagTapperApp:
             except Exception:
                 pass
     
-    def handle_touch_start(self, x, y):
-        """Record touch start position for swipe detection."""
-        self.touch_start_x = x
-        self.touch_start_y = y
-        logging.debug(f"Touch start: X={x} Y={y}")
-    
-    # Swipe handling moved to Tabs component
-
     def draw_animation(self, surface):
         """Draw a short pre-execution animation (spinner + fade)."""
         if self.anim_start is None:
@@ -382,11 +368,7 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
-                            # record start position if available
-                            if app.last_touch_x is not None:
-                                app.touch_start_x = app.last_touch_x
-                                app.touch_start_y = app.last_touch_y
-                            # Start long-press immediately for destructive tabs (position-independent)
+                            # Start long-press only for action tabs
                             try:
                                 if app.TABS[app.active_tab]["id"] in ("reboot", "shutdown"):
                                     app.long_press_start_time = time.time()
@@ -397,29 +379,25 @@ def main():
                                 pass
                         else:  # Release
                             touched = False
-                            # Use simple position-based swipe detection (no timing constraint)
-                            if app.touch_start_x is not None and app.last_touch_x is not None:
+                            # Simple next-tab on touch release (unless long-press was executed)
+                            if not app.long_press_executed:
                                 try:
-                                    if app.tabs is not None:
-                                        app.tabs.handle_swipe(app.touch_start_x, app.last_touch_x, app)
+                                    app.active_tab = (app.active_tab + 1) % len(app.TABS)
+                                    logging.info(f"Touch released -> next tab: {app.TABS[app.active_tab]['label']}")
                                 except Exception:
                                     pass
                             # Reset touch and position buffer
                             app.last_touch_x = None
                             app.last_touch_y = None
-                            app.touch_start_x = None
-                            app.touch_start_y = None
                             try:
                                 app.pos_buffer.clear()
                             except Exception:
                                 pass
-                            # reset long-press unless it already executed
-                            if not app.long_press_executed:
-                                app.long_press_start_time = None
-                                app.long_press_progress = 0.0
-                                app.long_press_target = None
-                            else:
-                                app.long_press_target = None
+                            # reset long-press
+                            app.long_press_start_time = None
+                            app.long_press_progress = 0.0
+                            app.long_press_target = None
+                            app.long_press_executed = False
                         logging.debug(f'Touch event -> touched={touched}')
                     
                     elif ev[0] == 'POS':
@@ -435,15 +413,6 @@ def main():
                             except Exception:
                                 bx, by = sx, sy
                             logging.debug(f"Touch raw: X={x} Y={y} -> screen: X={sx} Y={sy} avg: X={bx} Y={by}")
-                            # Set touch_start on first POS event after press
-                            if touched and app.touch_start_x is None:
-                                app.handle_touch_start(bx, by)
-                                # If this is a destructive tab, start long-press timer
-                                if app.TABS[app.active_tab]["id"] in ("reboot", "shutdown"):
-                                    app.long_press_start_time = time.time()
-                                    app.long_press_target = app.active_tab
-                                    app.long_press_progress = 0.0
-                                    app.long_press_executed = False
                             app.last_touch_x = bx
                             app.last_touch_y = by
             
@@ -453,25 +422,16 @@ def main():
             try:
                 now = time.time()
                 if app.long_press_start_time is not None and touched and app.long_press_target == app.active_tab:
-                    # If touch moved too far from start, cancel
-                    if app.touch_start_x is not None and app.last_touch_x is not None:
-                        dx = app.last_touch_x - app.touch_start_x
-                        dy = app.last_touch_y - app.touch_start_y
-                        if (dx * dx + dy * dy) ** 0.5 > 30:
-                            # Movement cancelled long-press
-                            app.long_press_start_time = None
-                            app.long_press_progress = 0.0
-                        else:
-                            dt = now - app.long_press_start_time
-                            prog = max(0.0, min(1.0, dt / app.long_press_duration))
-                            app.long_press_progress = prog
-                            if prog >= 1.0 and not app.long_press_executed:
-                                # Start pre-execution animation; actual exec happens after animation
-                                tabid = app.TABS[app.active_tab]["id"]
-                                logging.info(f"Long-press triggered for {tabid}; starting pre-exec animation")
-                                app.exec_after_anim = tabid
-                                app.anim_start = now
-                                app.long_press_executed = True
+                    dt = now - app.long_press_start_time
+                    prog = max(0.0, min(1.0, dt / app.long_press_duration))
+                    app.long_press_progress = prog
+                    if prog >= 1.0 and not app.long_press_executed:
+                        # Start pre-execution animation; actual exec happens after animation
+                        tabid = app.TABS[app.active_tab]["id"]
+                        logging.info(f"Long-press triggered for {tabid}; starting pre-exec animation")
+                        app.exec_after_anim = tabid
+                        app.anim_start = now
+                        app.long_press_executed = True
                 else:
                     # Not holding or different tab: ensure progress reset
                     if not touched:

@@ -8,10 +8,6 @@ class Tabs:
         self.indicator_radius = 8
         self.indicator_spacing = 24
         self.indicator_margin = 30
-        # Swipe settings
-        self.last_swipe_time = 0.0
-        self.swipe_debounce = 0.2
-        self.threshold = 50
 
     def render(self, surface, app, styles, fonts):
         """Render header (title) and indicators. Returns a content_rect for tabs to draw into.
@@ -65,23 +61,4 @@ class Tabs:
         content_bottom = indicator_y - (self.indicator_radius * 2) - 12
         return pygame.Rect(0, content_top, w, max(0, content_bottom - content_top))
 
-    def handle_swipe(self, start_x, end_x, app):
-        """Handle swipe gesture and update app.active_tab. Returns True if changed."""
-        if start_x is None or end_x is None:
-            return False
-        delta_x = end_x - start_x
-        now = time.time()
-        if now - self.last_swipe_time < self.swipe_debounce:
-            return False
-        if abs(delta_x) > self.threshold:
-            if delta_x > 0:
-                if app.active_tab > 0:
-                    app.active_tab -= 1
-                    self.last_swipe_time = now
-                    return True
-            else:
-                if app.active_tab < len(app.TABS) - 1:
-                    app.active_tab += 1
-                    self.last_swipe_time = now
-                    return True
-        return False
+
