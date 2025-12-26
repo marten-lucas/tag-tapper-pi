@@ -113,9 +113,10 @@ def main():
             print(f'Creating VLAN interface {name} on {base_if} (id {vid})')
             run(['ip', 'link', 'add', 'link', base_if, 'name', name, 'type', 'vlan', 'id', vid])
             run(['ip', 'link', 'set', name, 'up'])
-        # Assign IP if provided
+        # Assign IP if provided in config (static IP). If missing, interface will use DHCP
         ip = desired_map[vid].get('ip')
         if ip:
+            print(f'Assigning static IP {ip} to {name}')
             cidr = parse_ip_cidr(ip)
             # Remove existing addresses on this interface first
             try:
@@ -123,6 +124,8 @@ def main():
             except Exception:
                 pass
             run(['ip', 'addr', 'add', cidr, 'dev', name])
+        else:
+            print(f'No static IP configured for {name}, will use DHCP if available')
 
     # Delete interfaces that match base_if.* but not desired
     existing = get_all_interfaces()

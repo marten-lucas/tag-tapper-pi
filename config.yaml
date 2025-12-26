@@ -1,17 +1,20 @@
 vlans:
 - id: 70
   name: Server
-  ip: 192.168.70.1
 - id: 80
   name: Jail
-  ip: 192.168.80.1
 - id: 100
   name: Infra
-  ip: 172.16.100.1
 - id: 178
   name: User
-  ip: 192.168.178.1
-external_pings:
+pings:
+- host: 192.168.70.1
+  name: Server VLAN Gateway
+- host: 192.168.80.1
+  name: Jail VLAN Gateway
+- host: 172.16.100.1
+  name: Infra VLAN Gateway
+
 - host: 8.8.8.8
   name: Google DNS
 wifi:
