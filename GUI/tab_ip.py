@@ -109,6 +109,14 @@ class TabIP:
             return False
         return False
 
+    def get_wifi_ssid(self, iface):
+        """Get the SSID for a wifi interface. Returns None if not connected or error."""
+        try:
+            out = subprocess.check_output(['iwgetid', iface, '-r'], stderr=subprocess.DEVNULL).decode('utf-8').strip()
+            return out if out else None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
     def draw(self, surface, rect, app, styles, fonts):
         # Use cached data updated by monitor thread for quick redraws
         with self._lock:
@@ -169,10 +177,18 @@ class TabIP:
                 vid = iface.split('.')[-1]
                 if vid in vlan_names:
                     display_name = f"{iface} {vlan_names[vid]}"
+            elif iface.startswith('wlan') or iface.startswith('wl'):
+                # Add SSID for wifi interfaces if available
+                ssid = self.get_wifi_ssid(iface)
+                if ssid:
+                    # Truncate SSID if too long (max 16 chars)
+                    ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
+                    display_name = f"{iface} ({ssid_short})"
 
             name_s = table_font.render(display_name, True, styles.TEXT_COLOR)
             surface.blit(name_s, (name_x, y))
-            ip_text = ip if ip else '-'
+            # Only show IP if interface is UP and has an IP
+            ip_text = ip if (ip and up) else '-'
             ip_s = table_font.render(ip_text, True, (200, 200, 200))
             surface.blit(ip_s, (ip_x, y))
             # Draw status icon: green filled circle if up+ip, otherwise red X
