@@ -393,16 +393,16 @@ def main():
                             # Simple next-tab on touch release only if it was not a long-press
                             if not was_hold:
                                 try:
-                                        old_tab = app.active_tab
+                                    old_tab = app.active_tab
                                     app.active_tab = (app.active_tab + 1) % len(app.TABS)
-                                        # Notify Range tab about visibility change
-                                        try:
-                                            if app.TABS[old_tab]['id'] == 'range':
-                                                app.components['range'].set_active(False)
-                                            if app.TABS[app.active_tab]['id'] == 'range':
-                                                app.components['range'].set_active(True)
-                                        except Exception:
-                                            pass
+                                    # Notify Range tab about visibility change
+                                    try:
+                                        if app.TABS[old_tab]['id'] == 'range':
+                                            app.components['range'].set_active(False)
+                                        if app.TABS[app.active_tab]['id'] == 'range':
+                                            app.components['range'].set_active(True)
+                                    except Exception:
+                                        pass
                                     logging.info(f"Touch released -> next tab: {app.TABS[app.active_tab]['label']}")
                                 except Exception:
                                     pass
