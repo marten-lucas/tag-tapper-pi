@@ -23,6 +23,7 @@ class TabIP:
         self.poll_interval = 2  # seconds between refreshes
         # Track previous state for change detection
         self.prev_up = {}
+        self.prev_ips = {}
         # Toast message system
         self.toast_message = None
         self.toast_time = 0
@@ -58,14 +59,33 @@ class TabIP:
             if iface not in self.prev_up:
                 # New interface detected (first time)
                 self.prev_up[iface] = ups[iface]
-            elif self.prev_up[iface] != ups[iface]:
-                # State changed
-                if ups[iface]:
-                    # Interface came UP
-                    self.toast_message = f"{iface} verbunden"
-                    self.toast_time = time.time()
-                # else: interface went down, no toast (noisy)
-                self.prev_up[iface] = ups[iface]
+                self.prev_ips[iface] = ips.get(iface)
+            else:
+                # Check for UP→DOWN or DOWN→UP transition
+                if self.prev_up[iface] != ups[iface]:
+                    if ups[iface]:
+                        # Interface came UP
+                        self.toast_message = f"{iface} verbunden"
+                        self.toast_time = time.time()
+                    else:
+                        # Interface went DOWN
+                        self.toast_message = f"{iface} getrennt"
+                        self.toast_time = time.time()
+                    self.prev_up[iface] = ups[iface]
+                
+                # Check for IP changes (gained IP or lost IP)
+                curr_ip = ips.get(iface)
+                prev_ip = self.prev_ips.get(iface)
+                if curr_ip != prev_ip:
+                    if curr_ip and not prev_ip:
+                        # Interface got an IP
+                        self.toast_message = f"{iface} verbunden"
+                        self.toast_time = time.time()
+                    elif not curr_ip and prev_ip:
+                        # Interface lost its IP
+                        self.toast_message = f"{iface} getrennt"
+                        self.toast_time = time.time()
+                    self.prev_ips[iface] = curr_ip
         
         with self._lock:
             self.cached_ifaces = ifaces
