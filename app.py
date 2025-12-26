@@ -379,8 +379,21 @@ def main():
                                 pass
                         else:  # Release
                             touched = False
-                            # Simple next-tab on touch release (unless long-press was executed)
-                            if not app.long_press_executed:
+                            # Determine whether this release follows a long-press.
+                            now_rel = time.time()
+                            was_hold = False
+                            try:
+                                if app.long_press_executed:
+                                    was_hold = True
+                                elif app.long_press_start_time is not None and (now_rel - app.long_press_start_time) >= app.long_press_duration:
+                                    was_hold = True
+                                elif app.exec_after_anim is not None:
+                                    was_hold = True
+                            except Exception:
+                                was_hold = False
+
+                            # Simple next-tab on touch release only if it was not a long-press
+                            if not was_hold:
                                 try:
                                     app.active_tab = (app.active_tab + 1) % len(app.TABS)
                                     logging.info(f"Touch released -> next tab: {app.TABS[app.active_tab]['label']}")

@@ -132,20 +132,22 @@ class TabIP:
                 if n not in candidates:
                     candidates.append(n)
 
+        # Use a smaller font for the table to fit more rows and reduce top spacing
+        table_font = fonts.get('tab_title', fonts['content'])
         # Prepare drawing positions
-        row_h = fonts['content'].get_height() + 8
-        start_y = rect.top + 100
-        name_x = rect.left + 40
-        ip_x = rect.right - 260
-        status_x = rect.right - 80
+        row_h = table_font.get_height() + 6
+        start_y = rect.top + 40
+        name_x = rect.left + 28
+        ip_x = rect.right - 220
+        status_x = rect.right - 60
 
         # Header row
-        hdr_name = fonts['content'].render('Schnittstelle', True, styles.TEXT_COLOR)
-        hdr_ip = fonts['content'].render('IP', True, styles.TEXT_COLOR)
-        hdr_status = fonts['content'].render('OK', True, styles.TEXT_COLOR)
-        surface.blit(hdr_name, (name_x, rect.top + 60))
-        surface.blit(hdr_ip, (ip_x, rect.top + 60))
-        surface.blit(hdr_status, (status_x - 10, rect.top + 60))
+        hdr_name = table_font.render('Schnittstelle', True, styles.TEXT_COLOR)
+        hdr_ip = table_font.render('IP', True, styles.TEXT_COLOR)
+        hdr_status = table_font.render('OK', True, styles.TEXT_COLOR)
+        surface.blit(hdr_name, (name_x, rect.top + 18))
+        surface.blit(hdr_ip, (ip_x, rect.top + 18))
+        surface.blit(hdr_status, (status_x - 6, rect.top + 18))
 
         # Rows
         for i, iface in enumerate(candidates):
@@ -159,18 +161,16 @@ class TabIP:
                 if vid in vlan_names:
                     display_name = f"{iface} {vlan_names[vid]}"
 
-            name_s = fonts['content'].render(display_name, True, styles.TEXT_COLOR)
+            name_s = table_font.render(display_name, True, styles.TEXT_COLOR)
             surface.blit(name_s, (name_x, y))
-
             ip_text = ip if ip else '-'
-            ip_s = fonts['content'].render(ip_text, True, (200, 200, 200))
+            ip_s = table_font.render(ip_text, True, (200, 200, 200))
             surface.blit(ip_s, (ip_x, y))
-
             if up and ip:
                 sym = '✓'
                 color = styles.TEXT_ACTIVE
             else:
                 sym = '✗'
                 color = (200, 60, 60)
-            sym_s = fonts['content'].render(sym, True, color)
+            sym_s = table_font.render(sym, True, color)
             surface.blit(sym_s, sym_s.get_rect(center=(status_x, y + row_h // 2)))
