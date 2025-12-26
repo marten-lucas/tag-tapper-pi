@@ -144,12 +144,16 @@ class TabPing:
         table_font = fonts.get('tab_title', fonts['content'])
         row_h = table_font.get_height() + 6
         
-        # Calculate column widths
-        name_col_width = 200
-        iface_col_width = 70
-        start_x = rect.left + 20
+        # Calculate column widths dynamically to fit all interfaces on screen
+        name_col_width = 190
+        start_x = rect.left + 10
         name_x = start_x
         iface_start_x = name_x + name_col_width
+        
+        # Calculate interface column width based on available space and number of interfaces
+        available_width = rect.width - name_col_width - 40  # Leave margin
+        num_ifaces = len(interfaces)
+        iface_col_width = min(70, available_width // num_ifaces) if num_ifaces > 0 else 70
         
         # Header background
         header_y = rect.top + 12
