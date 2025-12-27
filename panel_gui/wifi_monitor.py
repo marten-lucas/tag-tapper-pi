@@ -37,7 +37,7 @@ class WiFiMonitor:
         
         # Monitor thread
         self.stop_event = threading.Event()
-        self.update_interval = 3
+        self.update_interval = 10
         try:
             t = threading.Thread(target=self._monitor_loop, daemon=True)
             t.start()
