@@ -85,6 +85,21 @@ su - dietpi -c "cd /home/dietpi/tag-tapper-pi && TERM=linux COLORTERM=truecolor 
 
 Die App läuft auf TTY1 (physisches Display). SSH-Verbindungen nutzen separate TTYs.
 
+## Session-Reports
+
+Bei jeder LAN-Session (eth0-Kabel von eingesteckt bis abgezogen) wird ein Text-Report geschrieben, der die im Panel angezeigten IPs und Ping-Ergebnisse protokolliert.
+
+- Pfad konfigurieren in `config.yaml`:
+
+```yaml
+# Beispiel
+report_path: "/home/dietpi"
+```
+
+- Reports werden unter `<report_path>/tag-tapper-pi-reports/` abgelegt.
+- Dateiname: `session-YYYYMMDD-HHMMSS.txt` (Zeitpunkt des Session-Beginns).
+- Inhalt: IP-Tabelle (Status + IP) und Ping-Matrix (OK/FAIL je Ziel und Interface).
+
 ## Entwicklung
 
 **Test auf dem lokalen Rechner:**

@@ -195,6 +195,8 @@ class TagTapperApp:
         self.active_tab = 0
         self.last_touch_x = None
         self.last_touch_y = None
+        # Remember last content rect for aligning overlays/animations
+        self.current_content_rect = None
         
         # Layout constants - header + carousel
         self.header_height = 35
@@ -221,6 +223,19 @@ class TagTapperApp:
             }
         except Exception:
             self.components = {}
+
+        # Session reporter: monitors eth0 UP/DOWN and writes reports
+        try:
+            from tagtapperpi_comp.session_reporter import SessionReporter
+            ip_comp = self.components.get('ip')
+            ping_comp = self.components.get('ping')
+            if ip_comp and ping_comp:
+                self.session_reporter = SessionReporter(ip_comp, ping_comp)
+                self.session_reporter.start()
+            else:
+                self.session_reporter = None
+        except Exception:
+            self.session_reporter = None
 
         # Tabs/header component (handles title, indicators and swipe)
         try:
@@ -258,6 +273,12 @@ class TagTapperApp:
         else:
             content_rect = pygame.Rect(0, self.header_height, self.width, self.height - self.header_height)
 
+        # Store for overlay alignment (e.g., execution animation)
+        try:
+            self.current_content_rect = content_rect
+        except Exception:
+            pass
+
         # Delegate rendering of the content area to the active component
         tab = self.TABS[self.active_tab]
         comp = self.components.get(tab['id']) if hasattr(self, 'components') else None
@@ -292,9 +313,13 @@ class TagTapperApp:
             overlay.fill((0, 0, 0, alpha))
             surface.blit(overlay, (0, 0))
 
-            # Spinner at center
-            cx = self.width // 2
-            cy = self.header_height + 160
+            # Spinner aligned with content center (same as progress ring)
+            if self.current_content_rect is not None:
+                cx = self.current_content_rect.centerx
+                cy = self.current_content_rect.centery
+            else:
+                cx = self.width // 2
+                cy = self.header_height + (self.height - self.header_height) // 2
             radius = 70
             thickness = 14
             start_angle = -math.pi / 2
@@ -531,6 +556,12 @@ def main():
             pass
         try:
             pygame.quit()
+        except Exception:
+            pass
+        # Stop session reporter
+        try:
+            if getattr(app, 'session_reporter', None):
+                app.session_reporter.stop()
         except Exception:
             pass
 
