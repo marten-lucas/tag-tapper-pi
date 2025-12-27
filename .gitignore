@@ -215,3 +215,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 tagtapperpi_comp/__pycache__/*
+
+# Tag Tapper specific
+config_overrides.yaml
+tag-tapper-pi-reports/
+tag-tapper-pi.log
