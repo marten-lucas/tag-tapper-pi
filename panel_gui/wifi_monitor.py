@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class WiFiMonitor:
-    def __init__(self, interface='wlan0', history_size=20):
+    def __init__(self, interface='wlan0', history_size=20, update_interval=10):
         self._lock = threading.Lock()
         self.interface = interface
         self.history_size = history_size
@@ -37,7 +37,7 @@ class WiFiMonitor:
         
         # Monitor thread
         self.stop_event = threading.Event()
-        self.update_interval = 10
+        self.update_interval = update_interval
         try:
             t = threading.Thread(target=self._monitor_loop, daemon=True)
             t.start()
