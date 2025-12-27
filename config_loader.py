@@ -6,8 +6,9 @@ import os
 import yaml
 from pathlib import Path
 
-# Determine repo root (parent of tagtapperpi_comp)
-REPO_ROOT = Path(__file__).parent.parent
+# Determine repo root (directory of this file)
+# config.yaml lives in the same repository root alongside this config_loader.py
+REPO_ROOT = Path(__file__).parent
 BASE_CONFIG_PATH = REPO_ROOT / "config.yaml"
 OVERRIDE_CONFIG_PATH = Path("/mnt/dietpi_userdata/config_overrides.yaml")
 
