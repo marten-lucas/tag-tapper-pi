@@ -8,6 +8,7 @@ try:
 except Exception:
     pygame = None
 from config_loader import load_config
+from wifi_monitor import WiFiMonitor
 
 
 class TabRange:
@@ -20,6 +21,9 @@ class TabRange:
         self.interface = 'wlan0'
         self.update_interval = 5
         self.target_ssids = []
+        
+        # WiFi state monitor (bandsteering, roaming)
+        self.wifi_monitor = WiFiMonitor(interface=self.interface)
         
         # Load initial config
         self.refresh_config()
@@ -166,13 +170,17 @@ class TabRange:
             return int(((dbm + 90) / 60) * 100)
     
     def draw(self, surface, rect, app, styles, fonts):
-        """Draw WiFi signal strength bars."""
+        """Draw WiFi signal strength bars and roaming/bandsteering info."""
         with self._lock:
             signals = dict(self.signal_strengths)
             connected = self.connected_ssid
             ssids = list(self.target_ssids)
             last_update = self.last_update
             update_times = dict(self.last_update_per_ssid)
+        
+        # Get WiFi state for roaming/bandsteering info
+        wifi_state = self.wifi_monitor.get_state()
+        wifi_summary = self.wifi_monitor.get_summary()
         
         if not ssids:
             # No SSIDs configured
@@ -183,8 +191,9 @@ class TabRange:
         # Use content font for SSID names
         ssid_font = fonts.get('tab_title', fonts['content'])
         label_font = fonts.get('header', fonts['content'])
+        small_font = fonts.get('content', label_font)
         
-        # Calculate layout
+        # Calculate layout - reserve bottom area for WiFi info
         bar_height = 30
         bar_spacing = 50
         bar_width = rect.width - 80
@@ -255,3 +264,13 @@ class TabRange:
             percent_x = start_x + bar_width + 10
             percent_y = bar_y + (bar_height - label_font.get_height()) // 2
             surface.blit(percent_s, (percent_x, percent_y))
+        
+        # Draw WiFi state info (roaming, band, AP) at bottom
+        if wifi_state['ssid']:
+            info_y = rect.bottom - len(wifi_summary) * (small_font.get_height() + 3) - 5
+            
+            for line in wifi_summary:
+                line_s = small_font.render(line, True, styles.TEXT_COLOR)
+                surface.blit(line_s, (start_x, info_y))
+                info_y += small_font.get_height() + 3
+
