@@ -165,6 +165,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 0.75rem;
+            align-items: end;
         }
 
         .array-item-header {
@@ -286,6 +287,8 @@
 
     <script>
         let globalConfig = {};
+        let lastLiveIpJSON = '';
+        let lastLivePingJSON = '';
 
         // Tab switching
         function switchTab(tabName) {
@@ -472,6 +475,15 @@
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'array-item';
 
+                const rmBtn = document.createElement('button');
+                rmBtn.type = 'button';
+                rmBtn.className = 'secondary outline';
+                rmBtn.textContent = '🗑️ Löschen';
+                rmBtn.onclick = () => {
+                    arr.splice(index, 1);
+                    renderConfig(globalConfig);
+                };
+
                 if (typeof item === 'object' && item !== null) {
                     const fieldsContainer = document.createElement('div');
                     fieldsContainer.className = 'array-item-fields';
@@ -499,8 +511,17 @@
                         fieldsContainer.appendChild(field);
                     });
 
+                    fieldsContainer.appendChild(rmBtn);
+
                     itemDiv.appendChild(fieldsContainer);
                 } else {
+                    const scalarContainer = document.createElement('div');
+                    scalarContainer.style.display = 'flex';
+                    scalarContainer.style.gap = '0.75rem';
+                    scalarContainer.style.alignItems = 'end';
+
+                    const inputWrapper = document.createElement('div');
+                    inputWrapper.style.flex = '1';
                     const input = document.createElement('input');
                     input.type = typeof item === 'number' ? 'number' : 'text';
                     input.value = item;
@@ -511,19 +532,13 @@
                         setByPath(globalConfig, [...path, index], v);
                     });
 
-                    itemDiv.appendChild(input);
+                    inputWrapper.appendChild(input);
+                    scalarContainer.appendChild(inputWrapper);
+                    scalarContainer.appendChild(rmBtn);
+
+                    itemDiv.appendChild(scalarContainer);
                 }
 
-                const rmBtn = document.createElement('button');
-                rmBtn.type = 'button';
-                rmBtn.className = 'secondary outline';
-                rmBtn.textContent = '🗑️ Löschen';
-                rmBtn.onclick = () => {
-                    arr.splice(index, 1);
-                    renderConfig(globalConfig);
-                };
-
-                itemDiv.appendChild(rmBtn);
                 arrayDiv.appendChild(itemDiv);
             });
 
@@ -563,6 +578,15 @@
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'array-item';
 
+                const rmBtn = document.createElement('button');
+                rmBtn.type = 'button';
+                rmBtn.className = 'secondary outline';
+                rmBtn.textContent = '🗑️ Löschen';
+                rmBtn.onclick = () => {
+                    arr.splice(index, 1);
+                    renderConfig(globalConfig);
+                };
+
                 if (typeof item === 'object' && item !== null) {
                     const fieldsContainer = document.createElement('div');
                     fieldsContainer.className = 'array-item-fields';
@@ -589,8 +613,17 @@
                         fieldsContainer.appendChild(field);
                     });
 
+                    fieldsContainer.appendChild(rmBtn);
+
                     itemDiv.appendChild(fieldsContainer);
                 } else {
+                    const scalarContainer = document.createElement('div');
+                    scalarContainer.style.display = 'flex';
+                    scalarContainer.style.gap = '0.75rem';
+                    scalarContainer.style.alignItems = 'end';
+
+                    const inputWrapper = document.createElement('div');
+                    inputWrapper.style.flex = '1';
                     const input = document.createElement('input');
                     input.type = typeof item === 'number' ? 'number' : 'text';
                     input.value = item;
@@ -601,19 +634,13 @@
                         setByPath(globalConfig, [...path, index], v);
                     });
 
-                    itemDiv.appendChild(input);
+                    inputWrapper.appendChild(input);
+                    scalarContainer.appendChild(inputWrapper);
+                    scalarContainer.appendChild(rmBtn);
+
+                    itemDiv.appendChild(scalarContainer);
                 }
 
-                const rmBtn = document.createElement('button');
-                rmBtn.type = 'button';
-                rmBtn.className = 'secondary outline';
-                rmBtn.textContent = '🗑️ Löschen';
-                rmBtn.onclick = () => {
-                    arr.splice(index, 1);
-                    renderConfig(globalConfig);
-                };
-
-                itemDiv.appendChild(rmBtn);
                 arrayDiv.appendChild(itemDiv);
             });
 
@@ -682,6 +709,11 @@
 
         // Live tab rendering
         function renderLiveIp(data) {
+            const json = JSON.stringify(data || {});
+            if (json === lastLiveIpJSON) {
+                return; // No change; avoid rebuilding the table
+            }
+            lastLiveIpJSON = json;
             const div = document.getElementById('liveIp');
             const rows = data.interfaces || [];
             let html = '<h3>Schnittstellen</h3>';
@@ -700,6 +732,7 @@
         }
 
         function renderLiveIpError(error) {
+            lastLiveIpJSON = '';
             const div = document.getElementById('liveIp');
             div.innerHTML = '<h3>Schnittstellen</h3><p style="color: var(--del-color);">⚠️ Fehler beim Laden der Schnittstellen</p>';
         }
@@ -710,6 +743,11 @@
         }
 
         function renderLivePing(data) {
+            const json = JSON.stringify(data || {});
+            if (json === lastLivePingJSON) {
+                return; // No change; avoid rebuilding the table
+            }
+            lastLivePingJSON = json;
             const div = document.getElementById('livePing');
             const ifaces = data.interfaces || [];
             const targets = data.targets || [];
@@ -739,6 +777,7 @@
         }
 
         function renderLivePingError(error) {
+            lastLivePingJSON = '';
             const div = document.getElementById('livePing');
             div.innerHTML = '<h3>Ping</h3><p style="color: var(--del-color);">⚠️ Fehler beim Laden der Ping-Daten</p>';
         }
