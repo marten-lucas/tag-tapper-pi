@@ -81,11 +81,13 @@
             border-radius: var(--border-radius);
             margin-bottom: 1rem;
             overflow: hidden;
+            background: var(--card-background-color, #fff);
         }
 
         .accordion-header {
-            padding: 1rem;
-            background-color: var(--gray-bg, #f6f6f6);
+            padding: 1rem 1.25rem;
+            background-color: var(--card-background-color, #fff);
+            color: var(--text-color);
             cursor: pointer;
             border: none;
             width: 100%;
@@ -95,7 +97,8 @@
             justify-content: space-between;
             align-items: center;
             font-size: 1rem;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, color 0.2s;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .accordion-header:hover {
@@ -103,18 +106,40 @@
         }
 
         .accordion-header.active {
-            background-color: var(--primary-color);
-            color: white;
+            background-color: var(--primary-background, rgba(0, 0, 0, 0.03));
+            color: var(--text-color);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        /* Caret indicator */
+        .accordion-header::after {
+            content: '▸';
+            font-size: 1rem;
+            margin-left: 0.75rem;
+            color: var(--muted-color);
+        }
+
+        .accordion-header.active::after {
+            content: '▾';
+            color: var(--primary-color);
         }
 
         .accordion-body {
             display: none;
-            padding: 1.5rem;
+            padding: 1.25rem 1.25rem 1.5rem;
             border-top: 1px solid var(--border-color);
+            background: var(--card-background-color, #fff);
         }
 
         .accordion-body.active {
             display: block;
+        }
+
+        .section-title {
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
         }
 
         .form-group {
@@ -337,6 +362,12 @@
 
             const body = document.createElement('div');
             body.className = 'accordion-body active';
+
+            // Visible section title inside the opened accordion
+            const sectionTitle = document.createElement('h3');
+            sectionTitle.className = 'section-title';
+            sectionTitle.textContent = formatSectionName(name);
+            body.appendChild(sectionTitle);
 
             if (Array.isArray(value)) {
                 renderArraySection(value, path, body);
