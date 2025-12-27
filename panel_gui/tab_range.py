@@ -29,15 +29,20 @@ class TabRange:
         self.last_update_per_ssid = {}  # {ssid: timestamp} for blink effect
         self.interface = 'wlan0'
         self.update_interval = 5
+        self.details_update_interval = 5
         self.target_ssids = []
         
         # WiFi state monitor (bandsteering, roaming) - optional
         self.wifi_monitor = None
         self.wifi_state_cache = None
         self.wifi_state_cache_time = 0
+        
+        # Load initial config (populates interface, intervals, SSIDs)
+        self.refresh_config()
+        
         if WIFI_MONITOR_AVAILABLE:
             try:
-                self.wifi_monitor = WiFiMonitor(interface=self.interface, update_interval=10)
+                self.wifi_monitor = WiFiMonitor(interface=self.interface, update_interval=self.details_update_interval)
                 import logging
                 logging.info(f"WiFiMonitor initialized: {self.wifi_monitor}")
             except Exception as e:
@@ -48,9 +53,6 @@ class TabRange:
         self.last_ap_mac = None
         self.ap_changed = False
         self.ap_change_time = None
-        
-        # Load initial config
-        self.refresh_config()
         
         # Start scanning thread
         self.stop_event = threading.Event()
@@ -73,6 +75,7 @@ class TabRange:
             scanner_cfg = cfg.get('range_scanner', {})
             self.interface = scanner_cfg.get('interface', 'wlan0')
             self.update_interval = scanner_cfg.get('update_interval', 5)
+            self.details_update_interval = scanner_cfg.get('update_details', self.details_update_interval)
             
             # Get target SSIDs
             ssids = []
@@ -83,6 +86,12 @@ class TabRange:
             
             with self._lock:
                 self.target_ssids = ssids
+                # Reset detail cache so new interval applies immediately
+                self.wifi_state_cache = None
+                self.wifi_state_cache_time = 0
+            
+            if self.wifi_monitor:
+                self.wifi_monitor.update_interval = self.details_update_interval
         
         except Exception:
             pass
@@ -207,7 +216,7 @@ class TabRange:
         now = time.time()
         if self.wifi_monitor:
             # Cache state for 5 seconds to avoid querying too often
-            if self.wifi_state_cache is None or (now - self.wifi_state_cache_time) > 5:
+            if self.wifi_state_cache is None or (now - self.wifi_state_cache_time) > self.details_update_interval:
                 try:
                     self.wifi_state_cache = self.wifi_monitor.get_state()
                     self.wifi_state_cache_time = now
@@ -232,7 +241,7 @@ class TabRange:
         # Use content font for SSID names
         ssid_font = fonts.get('tab_title', fonts['content'])
         label_font = fonts.get('header', fonts['content'])
-        small_font = fonts.get('content', label_font)
+        small_font = fonts.get('small', fonts.get('content', label_font))
         
         # Calculate layout
         bar_height = 30
@@ -308,8 +317,13 @@ class TabRange:
                     # Show last 6 chars of MAC for brevity
                     mac_short = wifi_state['ap_mac'][-8:] if len(wifi_state['ap_mac']) >= 8 else wifi_state['ap_mac']
                     info_parts.append(mac_short)
-                if wifi_state.get('signal_dbm') is not None:
-                    info_parts.append(f"{wifi_state['signal_dbm']}dBm")
+                if wifi_state.get('link_speed') is not None:
+                    try:
+                        speed_val = float(wifi_state['link_speed'])
+                        if speed_val >= 1:
+                            info_parts.append(f"{int(round(speed_val))} Mbps")
+                    except Exception:
+                        pass
                 
                 if info_parts:
                     info_text = " | ".join(info_parts)
