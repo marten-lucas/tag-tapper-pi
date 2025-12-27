@@ -24,4 +24,5 @@ range_scanner:
     - name: "Spezialgelagertes Sonder-WLAN"
     - name: "Kita Gramschatz"
     - name: "ShellyPlus1-D4D4DAF4B6B0"
-      
+
+report_path: "/mnt/dietpi_userdata/downloads/tag-tapper-pi-reports"
