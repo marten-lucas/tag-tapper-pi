@@ -8,6 +8,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 
 # Add parent to path for imports
@@ -19,6 +20,7 @@ from config_loader import load_base_config, load_user_overrides, merge_configs, 
 # Configuration paths
 CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
 USERDATA_DIR = "/mnt/dietpi_userdata"
+REPORT_DIR_NAME = "tag-tapper-pi-reports"
 
 # Ensure userdata directory exists
 os.makedirs(USERDATA_DIR, exist_ok=True)
@@ -58,6 +60,28 @@ def deep_update(target, source):
         else:
             target[key] = value
     return target
+
+
+def get_report_dir():
+    """Resolve report directory using config.report_path or repo root."""
+    try:
+        cfg = load_config()
+        base_path = cfg.get("report_path")
+    except Exception:
+        base_path = None
+    if not base_path:
+        base_path = REPO_ROOT
+    return os.path.join(base_path, REPORT_DIR_NAME)
+
+
+def ensure_report_dir():
+    """Create report directory if missing and return its path."""
+    report_dir = get_report_dir()
+    try:
+        os.makedirs(report_dir, exist_ok=True)
+    except Exception:
+        pass
+    return report_dir
 
 
 @app.route('/')
@@ -313,6 +337,78 @@ def live_ping():
         'results': results,
         'timestamp': time.time()
     })
+
+
+@app.route('/api/reports', methods=['GET'])
+def list_reports():
+    """List available report files and return their content."""
+    report_dir = ensure_report_dir()
+    items = []
+    try:
+        if not os.path.isdir(report_dir):
+            return jsonify({'reports': []})
+
+        for entry in os.scandir(report_dir):
+            if entry.is_file() and entry.name.endswith('.txt'):
+                try:
+                    stat = entry.stat()
+                    created_ts = stat.st_mtime
+                    created_iso = datetime.fromtimestamp(created_ts).isoformat()
+                    with open(entry.path, 'r') as f:
+                        content = f.read()
+                    items.append({
+                        'name': entry.name,
+                        'created_ts': created_ts,
+                        'created_iso': created_iso,
+                        'size': stat.st_size,
+                        'content': content,
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to read report {entry.name}: {e}")
+
+        items.sort(key=lambda x: x.get('created_ts', 0), reverse=True)
+        return jsonify({'reports': items})
+    except Exception as e:
+        logger.error(f"Error listing reports: {e}")
+        return jsonify({'error': 'Failed to list reports'}), 500
+
+
+@app.route('/api/reports/<path:report_name>', methods=['DELETE'])
+def delete_report(report_name):
+    """Delete a single report by name."""
+    report_dir = ensure_report_dir()
+    base = os.path.abspath(report_dir) + os.sep
+    target = os.path.abspath(os.path.join(report_dir, report_name))
+    if not target.startswith(base):
+        return jsonify({'error': 'Invalid report path'}), 400
+    if not os.path.isfile(target):
+        return jsonify({'error': 'Report not found'}), 404
+    try:
+        os.remove(target)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error deleting report {report_name}: {e}")
+        return jsonify({'error': 'Failed to delete report'}), 500
+
+
+@app.route('/api/reports', methods=['DELETE'])
+def delete_all_reports():
+    """Delete all report text files."""
+    report_dir = ensure_report_dir()
+    removed = 0
+    try:
+        if os.path.isdir(report_dir):
+            for entry in os.scandir(report_dir):
+                if entry.is_file() and entry.name.endswith('.txt'):
+                    try:
+                        os.remove(entry.path)
+                        removed += 1
+                    except Exception as e:
+                        logger.error(f"Error deleting report {entry.name}: {e}")
+        return jsonify({'success': True, 'removed': removed})
+    except Exception as e:
+        logger.error(f"Error deleting all reports: {e}")
+        return jsonify({'error': 'Failed to delete reports'}), 500
 
 
 if __name__ == '__main__':

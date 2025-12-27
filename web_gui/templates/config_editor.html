@@ -168,7 +168,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 0.75rem;
-            align-items: end;
+            align-items: center;
         }
 
         .array-item-header {
@@ -248,6 +248,37 @@
         .button-group button {
             flex: 1;
         }
+
+        .reports-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .reports-actions .actions-right {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .report-meta {
+            color: var(--muted-color);
+            font-size: 0.95rem;
+        }
+
+        .report-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            margin-top: 0.75rem;
+        }
+
+        .report-content {
+            width: 100%;
+            min-height: 160px;
+            resize: vertical;
+        }
     </style>
 </head>
 
@@ -286,16 +317,24 @@
 
     <!-- Reports Tab -->
     <div class="tab-content" id="reports">
-        <div class="empty-tab">
+        <section>
             <h2>📋 Reports</h2>
-            <p>Hier werden bald verfügbare Reports angezeigt.</p>
-        </div>
+            <div class="reports-actions">
+                <div class="actions-right">
+                    <button type="button" class="secondary outline" onclick="fetchReports()">🔄 Aktualisieren</button>
+                    <button type="button" class="secondary outline" onclick="deleteAllReports()">🗑️ Alle löschen</button>
+                </div>
+                <span id="reportsStatus" class="report-meta"></span>
+            </div>
+            <div id="reportsList"></div>
+        </section>
     </div>
 
     <script>
         let globalConfig = {};
         let lastLiveIpJSON = '';
         let lastLivePingJSON = '';
+        let lastReportsJSON = '';
 
         // Tab switching
         function switchTab(tabName) {
@@ -311,6 +350,10 @@
             // Show selected tab
             document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
+
+            if (tabName === 'reports') {
+                fetchReports();
+            }
         }
 
         // Load config on page load
@@ -525,7 +568,7 @@
                     const scalarContainer = document.createElement('div');
                     scalarContainer.style.display = 'flex';
                     scalarContainer.style.gap = '0.75rem';
-                    scalarContainer.style.alignItems = 'end';
+                    scalarContainer.style.alignItems = 'center';
 
                     const inputWrapper = document.createElement('div');
                     inputWrapper.style.flex = '1';
@@ -794,6 +837,164 @@
             div.innerHTML = '<h3>Ping</h3><p style="color: var(--muted-color);">Lädt...</p>';
         }
 
+        // Reports tab helpers
+        function formatTimestamp(ts) {
+            if (typeof ts !== 'number') return '-';
+            try {
+                return new Date(ts * 1000).toLocaleString('de-DE');
+            } catch (e) {
+                return '-';
+            }
+        }
+
+        function renderReportsLoading() {
+            const list = document.getElementById('reportsList');
+            list.innerHTML = '<p style="color: var(--muted-color);">Lädt...</p>';
+            const status = document.getElementById('reportsStatus');
+            status.textContent = '';
+        }
+
+        function renderReportsError() {
+            const list = document.getElementById('reportsList');
+            list.innerHTML = '<p style="color: var(--del-color);">⚠️ Fehler beim Laden der Reports</p>';
+            const status = document.getElementById('reportsStatus');
+            status.textContent = '';
+        }
+
+        function renderReports(data) {
+            const json = JSON.stringify(data || {});
+            if (json === lastReportsJSON) {
+                return;
+            }
+            lastReportsJSON = json;
+
+            const list = document.getElementById('reportsList');
+            const status = document.getElementById('reportsStatus');
+            const reports = (data && data.reports) ? data.reports : [];
+
+            if (!reports.length) {
+                list.innerHTML = '<p style="color: var(--muted-color);">Keine Reports vorhanden</p>';
+                status.textContent = '';
+                return;
+            }
+
+            list.innerHTML = '';
+            status.textContent = `${reports.length} Report${reports.length === 1 ? '' : 's'}`;
+
+            reports.forEach(rep => {
+                const acc = document.createElement('div');
+                acc.className = 'accordion';
+
+                const header = document.createElement('button');
+                header.type = 'button';
+                header.className = 'accordion-header';
+
+                const titleSpan = document.createElement('span');
+                titleSpan.textContent = rep.name;
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'report-meta';
+                dateSpan.textContent = formatTimestamp(rep.created_ts);
+
+                header.appendChild(titleSpan);
+                header.appendChild(dateSpan);
+
+                const body = document.createElement('div');
+                body.className = 'accordion-body';
+
+                const textarea = document.createElement('textarea');
+                textarea.className = 'report-content';
+                textarea.readOnly = true;
+                textarea.value = rep.content || '';
+                const lineCount = textarea.value.split('\n').length + 2;
+                textarea.rows = Math.min(18, Math.max(8, lineCount));
+
+                const btnRow = document.createElement('div');
+                btnRow.className = 'report-buttons';
+
+                const copyBtn = document.createElement('button');
+                copyBtn.type = 'button';
+                copyBtn.className = 'secondary outline';
+                copyBtn.textContent = '📋 Kopieren';
+                copyBtn.onclick = async () => {
+                    try {
+                        await navigator.clipboard.writeText(rep.content || '');
+                        copyBtn.textContent = '✅ Kopiert';
+                        setTimeout(() => copyBtn.textContent = '📋 Kopieren', 1200);
+                    } catch (err) {
+                        copyBtn.textContent = '⚠️ Fehler';
+                        setTimeout(() => copyBtn.textContent = '📋 Kopieren', 1200);
+                    }
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'secondary outline';
+                delBtn.textContent = '🗑️ Löschen';
+                delBtn.onclick = () => deleteReport(rep.name);
+
+                btnRow.appendChild(copyBtn);
+                btnRow.appendChild(delBtn);
+
+                body.appendChild(textarea);
+                body.appendChild(btnRow);
+
+                header.onclick = (e) => {
+                    e.preventDefault();
+                    header.classList.toggle('active');
+                    body.classList.toggle('active');
+                };
+
+                acc.appendChild(header);
+                acc.appendChild(body);
+                list.appendChild(acc);
+            });
+        }
+
+        function fetchReports() {
+            renderReportsLoading();
+            fetch('/api/reports', { signal: AbortSignal.timeout(8000) })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(renderReports)
+                .catch(err => {
+                    console.error('Reports fetch failed:', err);
+                    lastReportsJSON = '';
+                    renderReportsError();
+                });
+        }
+
+        function deleteReport(name) {
+            if (!confirm(`Report "${name}" löschen?`)) return;
+            fetch(`/api/reports/${encodeURIComponent(name)}`, { method: 'DELETE' })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                })
+                .then(fetchReports)
+                .catch(err => {
+                    console.error('Delete report failed:', err);
+                    alert('Konnte Report nicht löschen');
+                });
+        }
+
+        function deleteAllReports() {
+            if (!confirm('Alle Reports löschen?')) return;
+            fetch('/api/reports', { method: 'DELETE' })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                })
+                .then(() => {
+                    lastReportsJSON = '';
+                    fetchReports();
+                })
+                .catch(err => {
+                    console.error('Delete all reports failed:', err);
+                    alert('Konnte Reports nicht löschen');
+                });
+        }
+
         function fetchLiveIp() {
             if (!lastLiveIpJSON) {
                 renderLiveIpLoading();
@@ -834,6 +1035,9 @@
         fetchLivePing();
         setInterval(fetchLiveIp, 5000);
         setInterval(fetchLivePing, 10000);
+
+        // Load reports when the tab is visited (and once on startup for freshness)
+        fetchReports();
     </script>
 </body>
 
