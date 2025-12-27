@@ -13,7 +13,7 @@ from flask import Flask, render_template, request, jsonify
 from functools import wraps
 
 # Configuration paths
-REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
 USERDATA_DIR = "/mnt/dietpi_userdata"
 OVERRIDES_PATH = os.path.join(USERDATA_DIR, "config_overrides.yaml")
