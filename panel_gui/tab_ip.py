@@ -40,16 +40,35 @@ class TabIP:
             time.sleep(self.poll_interval)
 
     def refresh_cache(self):
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         try:
             ifaces = self.get_all_interfaces()
         except Exception:
             ifaces = []
         vlan_names = self.load_vlan_names()
+        
+        # Query interface info in parallel
         ips = {}
         ups = {}
-        for iface in ifaces:
-            ips[iface] = self.get_ip_for_iface(iface)
-            ups[iface] = self.iface_is_up(iface)
+        
+        if ifaces:
+            def query_interface(iface):
+                return (iface, self.get_ip_for_iface(iface), self.iface_is_up(iface))
+            
+            max_workers = min(10, len(ifaces))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(query_interface, iface): iface for iface in ifaces}
+                
+                for future in as_completed(futures):
+                    try:
+                        iface, ip, up = future.result()
+                        ips[iface] = ip
+                        ups[iface] = up
+                    except Exception:
+                        iface = futures[future]
+                        ips[iface] = None
+                        ups[iface] = False
         
         # Detect state changes and generate toast messages
         for iface in ups:

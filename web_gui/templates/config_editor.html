@@ -156,7 +156,14 @@
             border-radius: var(--border-radius);
             padding: 1rem;
             margin-bottom: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .array-item-fields {
             display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 0.75rem;
         }
 
@@ -466,6 +473,9 @@
                 itemDiv.className = 'array-item';
 
                 if (typeof item === 'object' && item !== null) {
+                    const fieldsContainer = document.createElement('div');
+                    fieldsContainer.className = 'array-item-fields';
+
                     const fields = Object.entries(item);
                     fields.forEach(([key, val]) => {
                         const field = document.createElement('div');
@@ -486,8 +496,10 @@
 
                         field.appendChild(lbl);
                         field.appendChild(input);
-                        itemDiv.appendChild(field);
+                        fieldsContainer.appendChild(field);
                     });
+
+                    itemDiv.appendChild(fieldsContainer);
                 } else {
                     const input = document.createElement('input');
                     input.type = typeof item === 'number' ? 'number' : 'text';
@@ -552,6 +564,9 @@
                 itemDiv.className = 'array-item';
 
                 if (typeof item === 'object' && item !== null) {
+                    const fieldsContainer = document.createElement('div');
+                    fieldsContainer.className = 'array-item-fields';
+
                     Object.entries(item).forEach(([key, val]) => {
                         const field = document.createElement('div');
                         field.className = 'form-group';
@@ -571,8 +586,10 @@
 
                         field.appendChild(lbl);
                         field.appendChild(input);
-                        itemDiv.appendChild(field);
+                        fieldsContainer.appendChild(field);
                     });
+
+                    itemDiv.appendChild(fieldsContainer);
                 } else {
                     const input = document.createElement('input');
                     input.type = typeof item === 'number' ? 'number' : 'text';

@@ -76,20 +76,32 @@ class TabPing:
 
     def _ping_loop(self):
         """Background thread that periodically pings all targets from all interfaces."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
         while not self.stop_event.is_set():
             self.refresh_config()
             results = {}
             
-            # Ping each target from each interface
+            # Collect all ping tasks
+            ping_tasks = []
             for iface in self.interfaces:
                 for target in self.ping_targets:
-                    host = target['host']
-                    # Check if interface exists before pinging
                     if self._interface_exists(iface):
-                        reachable = self._ping(iface, host)
+                        ping_tasks.append((iface, target['host']))
                     else:
-                        reachable = False
-                    results[(iface, host)] = reachable
+                        results.setdefault(iface, {})[target['host']] = False
+            
+            # Execute pings in parallel
+            if ping_tasks:
+                max_workers = min(20, len(ping_tasks))
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {executor.submit(self._ping, iface, host): (iface, host)
+                              for iface, host in ping_tasks}
+                    
+                    for future in as_completed(futures):
+                        iface, host = futures[future]
+                        reachable = future.result()
+                        results.setdefault(iface, {})[host] = reachable
             
             # Update cache
             with self._lock:
@@ -192,8 +204,7 @@ class TabPing:
             # Ping results for each interface
             for col_idx, iface in enumerate(interfaces):
                 col_x = iface_start_x + col_idx * iface_col_width
-                key = (iface, target['host'])
-                reachable = results.get(key, False)
+                reachable = results.get(iface, {}).get(target['host'], False)
                 
                 # Draw indicator dot
                 dot_x = col_x + 15

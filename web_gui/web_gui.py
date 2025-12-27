@@ -224,9 +224,11 @@ def live_ip():
 
 @app.route('/api/live/ping', methods=['GET'])
 def live_ping():
-    """Return ping matrix similar to panel ping tab."""
+    """Return ping matrix similar to panel ping tab. Uses parallel ping execution."""
     import subprocess
     import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     try:
         cfg = get_effective_config()
     except Exception:
@@ -272,7 +274,10 @@ def live_ping():
         except subprocess.CalledProcessError:
             return False
 
-    def ping_iface_host(iface, host):
+    def ping_single(iface, host):
+        """Ping single host from single interface. Returns (iface, host, reachable)."""
+        if not interface_exists(iface):
+            return (iface, host, False)
         try:
             result = subprocess.run(
                 ['ping', '-I', iface, '-c', '1', '-W', str(timeout), host],
@@ -280,16 +285,26 @@ def live_ping():
                 stderr=subprocess.DEVNULL,
                 timeout=timeout + 1
             )
-            return result.returncode == 0
+            return (iface, host, result.returncode == 0)
         except (subprocess.TimeoutExpired, Exception):
-            return False
+            return (iface, host, False)
 
-    results = {}
+    # Collect all ping tasks
+    ping_tasks = []
     for iface in interfaces:
-        results[iface] = {}
         for t in targets:
-            host = t['host']
-            reachable = ping_iface_host(iface, host) if interface_exists(iface) else False
+            ping_tasks.append((iface, t['host']))
+
+    # Execute pings in parallel
+    results = {iface: {} for iface in interfaces}
+    max_workers = min(20, len(ping_tasks)) if ping_tasks else 1
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(ping_single, iface, host): (iface, host) 
+                   for iface, host in ping_tasks}
+        
+        for future in as_completed(futures):
+            iface, host, reachable = future.result()
             results[iface][host] = reachable
 
     return jsonify({
