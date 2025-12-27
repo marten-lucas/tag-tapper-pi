@@ -247,128 +247,146 @@
                         addBtn.className = 'add outline';
                         addBtn.onclick = () => addArrayItem(currentPath);
                         container.appendChild(addBtn);
-                    } else if (typeof value === 'object' && value !== null) {
-                        Object.entries(value).forEach(([key, val]) => {
-                            const field = renderField(key, val, currentPath);
-                            container.appendChild(field);
-                        });
                     } else {
-                        const field = document.createElement('div');
-                        field.className = 'form-group';
-                        const label = document.createElement('label');
-                        label.textContent = formatSectionName(name);
-                        const input = document.createElement('input');
-                        input.type = typeof value === 'number' ? 'number' : 'text';
-                        input.value = value;
-                        input.dataset.path = JSON.stringify(currentPath);
-                        field.appendChild(label);
-                        field.appendChild(input);
-                        container.appendChild(field);
+                        const simpleInput = document.createElement('input');
+                        simpleInput.type = typeof item === 'number' ? 'number' : 'text';
+                        simpleInput.value = item;
+                        simpleInput.dataset.path = JSON.stringify([...currentPath, index]);
+                        itemDiv.appendChild(simpleInput);
                     }
 
-                    return container;
-                }
+                    container.appendChild(itemDiv);
+                });
+
+                // Add button für Array
+                const addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.textContent = '➕ Neuer Eintrag';
+                addBtn.className = 'add outline';
+                addBtn.onclick = () => addArrayItem(currentPath);
+                container.appendChild(addBtn);
+            } else if (typeof value === 'object' && value !== null) {
+                Object.entries(value).forEach(([key, val]) => {
+                    const field = renderField(key, val, currentPath);
+                    container.appendChild(field);
+                });
+            } else {
+                const field = document.createElement('div');
+                field.className = 'form-group';
+                const label = document.createElement('label');
+                label.textContent = formatSectionName(name);
+                const input = document.createElement('input');
+                input.type = typeof value === 'number' ? 'number' : 'text';
+                input.value = value;
+                input.dataset.path = JSON.stringify(currentPath);
+                field.appendChild(label);
+                field.appendChild(input);
+                container.appendChild(field);
+            }
+
+            return container;
+        }
 
         // Remove array item
         function removeArrayItem(path, index) {
-                        const arr = getByPath(globalConfig, path);
-                        if (Array.isArray(arr)) {
-                            arr.splice(index, 1);
-                            renderConfig(globalConfig);
-                        }
-                    }
+            const arr = getByPath(globalConfig, path);
+            if (Array.isArray(arr)) {
+                arr.splice(index, 1);
+                renderConfig(globalConfig);
+            }
+        }
 
         // Add array item
         function addArrayItem(path) {
-                        const arr = getByPath(globalConfig, path);
-                        if (Array.isArray(arr)) {
-                            // Infer structure from first item or create empty object
-                            const template = arr.length > 0 && typeof arr[0] === 'object' ? {} : '';
-                            arr.push(template);
-                            renderConfig(globalConfig);
-                        }
-                    }
+            const arr = getByPath(globalConfig, path);
+            if (Array.isArray(arr)) {
+                // Infer structure from first item or create empty object
+                const template = arr.length > 0 && typeof arr[0] === 'object' ? {} : '';
+                arr.push(template);
+                renderConfig(globalConfig);
+            }
+        }
 
         // Get value by path
         function getByPath(obj, path) {
-                        return path.reduce((curr, key) => curr[key], obj);
-                    }
+            return path.reduce((curr, key) => curr[key], obj);
+        }
 
         // Set value by path
         function setByPath(obj, path, value) {
-                        let current = obj;
-                        for (let i = 0; i < path.length - 1; i++) {
-                            const key = path[i];
-                            if (!(key in current)) {
-                                current[key] = {};
-                            }
-                            current = current[key];
-                        }
-                        current[path[path.length - 1]] = value;
-                    }
+            let current = obj;
+            for (let i = 0; i < path.length - 1; i++) {
+                const key = path[i];
+                if (!(key in current)) {
+                    current[key] = {};
+                }
+                current = current[key];
+            }
+            current[path[path.length - 1]] = value;
+        }
 
         // Collect form data
         function collectFormData() {
-                        const formData = {};
-                        const inputs = form.querySelectorAll('input');
-                        inputs.forEach(input => {
-                            if (input.dataset.path) {
-                                const path = JSON.parse(input.dataset.path);
-                                const value = input.type === 'number' ? parseFloat(input.value) : input.value;
-                                setByPath(formData, path, value);
-                            }
-                        });
-                        return formData;
-                    }
+            const formData = {};
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(input => {
+                if (input.dataset.path) {
+                    const path = JSON.parse(input.dataset.path);
+                    const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+                    setByPath(formData, path, value);
+                }
+            });
+            return formData;
+        }
 
         // Save config
         async function saveConfig(e) {
-                        e.preventDefault();
-                        const formData = collectFormData();
+            e.preventDefault();
+            const formData = collectFormData();
 
-                        loadingDiv.style.display = 'block';
-                        try {
-                            const response = await fetch('/api/config', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(formData)
-                            });
+            loadingDiv.style.display = 'block';
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
 
-                            if (!response.ok) throw new Error('Failed to save config');
-                            const result = await response.json();
-                            showAlert('Konfiguration erfolgreich gespeichert ✓', 'success');
-                        } catch (error) {
-                            console.error('Error saving config:', error);
-                            showAlert('Fehler beim Speichern der Konfiguration', 'error');
-                        } finally {
-                            loadingDiv.style.display = 'none';
-                        }
-                    }
+                if (!response.ok) throw new Error('Failed to save config');
+                const result = await response.json();
+                showAlert('Konfiguration erfolgreich gespeichert ✓', 'success');
+            } catch (error) {
+                console.error('Error saving config:', error);
+                showAlert('Fehler beim Speichern der Konfiguration', 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
 
         // Reset config
         async function resetConfig() {
-                        if (!confirm('Wirklich auf die Standardkonfiguration zurücksetzen?')) return;
+            if (!confirm('Wirklich auf die Standardkonfiguration zurücksetzen?')) return;
 
-                        loadingDiv.style.display = 'block';
-                        try {
-                            const response = await fetch('/api/config/reset', { method: 'POST' });
-                            if (!response.ok) throw new Error('Failed to reset config');
-                            await loadConfig();
-                            showAlert('Konfiguration auf Standard zurückgesetzt', 'success');
-                        } catch (error) {
-                            console.error('Error resetting config:', error);
-                            showAlert('Fehler beim Zurücksetzen der Konfiguration', 'error');
-                        } finally {
-                            loadingDiv.style.display = 'none';
-                        }
-                    }
+            loadingDiv.style.display = 'block';
+            try {
+                const response = await fetch('/api/config/reset', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to reset config');
+                await loadConfig();
+                showAlert('Konfiguration auf Standard zurückgesetzt', 'success');
+            } catch (error) {
+                console.error('Error resetting config:', error);
+                showAlert('Fehler beim Zurücksetzen der Konfiguration', 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
 
         // Event listeners
         form.addEventListener('submit', saveConfig);
-                resetBtn.addEventListener('click', resetConfig);
+        resetBtn.addEventListener('click', resetConfig);
 
-                // Load config on page load
-                loadConfig();
+        // Load config on page load
+        loadConfig();
     </script>
 </body>
 
