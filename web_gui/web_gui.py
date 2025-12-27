@@ -7,6 +7,11 @@ User-specific changes are saved to /mnt/dietpi_userdata/config_overrides.yaml
 import os
 import sys
 import logging
+import time
+import re
+import subprocess
+import pwd
+import grp
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
@@ -84,6 +89,190 @@ def ensure_report_dir():
     return report_dir
 
 
+def get_live_ip_state(cfg=None):
+    """Return interface list with IPs and status."""
+    if cfg is None:
+        try:
+            cfg = get_effective_config()
+        except Exception:
+            cfg = {}
+
+    # VLAN name mapping
+    vlan_names = {}
+    for v in cfg.get('vlans', []):
+        try:
+            vid = str(v.get('id'))
+            name = v.get('name') or ''
+            if vid:
+                vlan_names[vid] = name
+        except Exception:
+            pass
+
+    def get_all_interfaces():
+        try:
+            out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
+            names = []
+            for line in out.splitlines():
+                parts = line.split(':', 2)
+                if len(parts) >= 2:
+                    names.append(parts[1].strip().split('@')[0])
+            return names
+        except Exception:
+            return []
+
+    def get_ip_for_iface(iface):
+        try:
+            out = subprocess.check_output(['ip', '-o', '-4', 'addr', 'show', 'dev', iface]).decode('utf-8')
+            m = re.search(r'\binet (\S+)', out)
+            if m:
+                return m.group(1)
+        except subprocess.CalledProcessError:
+            return None
+        return None
+
+    def iface_is_up(iface):
+        try:
+            out = subprocess.check_output(['ip', '-o', 'link', 'show', 'dev', iface]).decode('utf-8')
+            m = re.search(r'\bstate\s+(\w+)', out)
+            if m:
+                return m.group(1).upper() == 'UP'
+        except subprocess.CalledProcessError:
+            return False
+        return False
+
+    def get_wifi_ssid(iface):
+        try:
+            out = subprocess.check_output(['iwgetid', iface, '-r'], stderr=subprocess.DEVNULL).decode('utf-8').strip()
+            return out if out else None
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+
+    ifaces = get_all_interfaces()
+
+    # Order: eth0, VLANs by id, then wlan*
+    candidates = []
+    if 'eth0' in ifaces:
+        candidates.append('eth0')
+    vlans = [n for n in ifaces if '.' in n]
+
+    def vlan_key(name):
+        try:
+            return int(name.split('.')[-1])
+        except Exception:
+            return 0
+
+    for n in sorted(vlans, key=vlan_key):
+        candidates.append(n)
+    for n in sorted(ifaces):
+        if n.startswith('wlan') or n.startswith('wl'):
+            if n not in candidates:
+                candidates.append(n)
+
+    items = []
+    for iface in candidates:
+        ip = get_ip_for_iface(iface)
+        up = iface_is_up(iface)
+        display_name = iface
+        if '.' in iface:
+            vid = iface.split('.')[-1]
+            if vid in vlan_names and vlan_names[vid]:
+                display_name = f"{iface} {vlan_names[vid]}"
+        elif iface.startswith('wlan') or iface.startswith('wl'):
+            ssid = get_wifi_ssid(iface)
+            if ssid:
+                ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
+                display_name = f"{iface} ({ssid_short})"
+        items.append({
+            'iface': iface,
+            'display_name': display_name,
+            'ip': ip if (ip and up) else None,
+            'up': up,
+        })
+
+    return {'interfaces': items, 'vlan_names': vlan_names}
+
+
+def get_live_ping_state(cfg=None):
+    """Return ping matrix data similar to panel."""
+    if cfg is None:
+        try:
+            cfg = get_effective_config()
+        except Exception:
+            cfg = {}
+
+    interfaces = []
+    if 'eth0' in subprocess.getoutput('ip -o link show'):
+        interfaces.append('eth0')
+    for v in cfg.get('vlans', []):
+        try:
+            vid = str(v.get('id'))
+            interfaces.append(f"eth0.{vid}")
+        except Exception:
+            pass
+    # Add wlan* interfaces
+    try:
+        out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
+        for line in out.splitlines():
+            parts = line.split(':', 2)
+            if len(parts) >= 2:
+                iface = parts[1].strip().split('@')[0]
+                if iface.startswith('wlan') or iface.startswith('wl'):
+                    if iface not in interfaces:
+                        interfaces.append(iface)
+    except Exception:
+        pass
+
+    targets = []
+    ping_cfg = cfg.get('pings', {})
+    timeout = int(ping_cfg.get('timeout', 2))
+    for p in ping_cfg.get('hosts', []):
+        host = p.get('host')
+        name = p.get('name', host)
+        if host:
+            targets.append({'host': host, 'name': name})
+
+    def interface_exists(iface):
+        try:
+            subprocess.check_output(['ip', 'link', 'show', 'dev', iface], stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
+    def ping_single(iface, host):
+        if not interface_exists(iface):
+            return (iface, host, False)
+        try:
+            result = subprocess.run(
+                ['ping', '-I', iface, '-c', '1', '-W', str(timeout), host],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=timeout + 1
+            )
+            return (iface, host, result.returncode == 0)
+        except (subprocess.TimeoutExpired, Exception):
+            return (iface, host, False)
+
+    ping_tasks = [(iface, t['host']) for iface in interfaces for t in targets]
+    results = {iface: {} for iface in interfaces}
+    max_workers = min(20, len(ping_tasks)) if ping_tasks else 1
+
+    if ping_tasks:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(ping_single, iface, host): (iface, host)
+                       for iface, host in ping_tasks}
+            for future in as_completed(futures):
+                iface, host, reachable = future.result()
+                results[iface][host] = reachable
+
+    return {
+        'interfaces': interfaces,
+        'targets': targets,
+        'results': results,
+        'timestamp': time.time()
+    }
+
+
 @app.route('/')
 def index():
     """Main config editor page."""
@@ -145,198 +334,67 @@ def health():
 @app.route('/api/live/ip', methods=['GET'])
 def live_ip():
     """Return current interface states and IPs, similar to panel IP tab."""
-    import re
-    import subprocess
-    try:
-        cfg = get_effective_config()
-    except Exception:
-        cfg = {}
-
-    # VLAN name mapping
-    vlan_names = {}
-    for v in cfg.get('vlans', []):
-        try:
-            vid = str(v.get('id'))
-            name = v.get('name') or ''
-            if vid:
-                vlan_names[vid] = name
-        except Exception:
-            pass
-
-    # Enumerate interfaces
-    def get_all_interfaces():
-        try:
-            out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
-            names = []
-            for line in out.splitlines():
-                parts = line.split(':', 2)
-                if len(parts) >= 2:
-                    names.append(parts[1].strip().split('@')[0])
-            return names
-        except Exception:
-            return []
-
-    def get_ip_for_iface(iface):
-        try:
-            out = subprocess.check_output(['ip', '-o', '-4', 'addr', 'show', 'dev', iface]).decode('utf-8')
-            m = re.search(r'\binet (\S+)', out)
-            if m:
-                return m.group(1)
-        except subprocess.CalledProcessError:
-            return None
-        return None
-
-    def iface_is_up(iface):
-        try:
-            out = subprocess.check_output(['ip', '-o', 'link', 'show', 'dev', iface]).decode('utf-8')
-            m = re.search(r'\bstate\s+(\w+)', out)
-            if m:
-                return m.group(1).upper() == 'UP'
-        except subprocess.CalledProcessError:
-            return False
-        return False
-
-    def get_wifi_ssid(iface):
-        try:
-            out = subprocess.check_output(['iwgetid', iface, '-r'], stderr=subprocess.DEVNULL).decode('utf-8').strip()
-            return out if out else None
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return None
-
-    ifaces = get_all_interfaces()
-
-    # Order: eth0, VLANs by id, then wlan*
-    candidates = []
-    if 'eth0' in ifaces:
-        candidates.append('eth0')
-    vlans = [n for n in ifaces if '.' in n]
-    def vlan_key(name):
-        try:
-            return int(name.split('.')[-1])
-        except Exception:
-            return 0
-    for n in sorted(vlans, key=vlan_key):
-        candidates.append(n)
-    for n in sorted(ifaces):
-        if n.startswith('wlan') or n.startswith('wl'):
-            if n not in candidates:
-                candidates.append(n)
-
-    items = []
-    for iface in candidates:
-        ip = get_ip_for_iface(iface)
-        up = iface_is_up(iface)
-        display_name = iface
-        if '.' in iface:
-            vid = iface.split('.')[-1]
-            if vid in vlan_names and vlan_names[vid]:
-                display_name = f"{iface} {vlan_names[vid]}"
-        elif iface.startswith('wlan') or iface.startswith('wl'):
-            ssid = get_wifi_ssid(iface)
-            if ssid:
-                ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
-                display_name = f"{iface} ({ssid_short})"
-        items.append({
-            'iface': iface,
-            'display_name': display_name,
-            'ip': ip if (ip and up) else None,
-            'up': up,
-        })
-
-    return jsonify({'interfaces': items, 'vlan_names': vlan_names})
+    return jsonify(get_live_ip_state())
 
 
 @app.route('/api/live/ping', methods=['GET'])
 def live_ping():
     """Return ping matrix similar to panel ping tab. Uses parallel ping execution."""
-    import subprocess
-    import time
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    
-    try:
-        cfg = get_effective_config()
-    except Exception:
-        cfg = {}
+    return jsonify(get_live_ping_state())
 
-    # Build interfaces
-    interfaces = []
-    if 'eth0' in subprocess.getoutput('ip -o link show'):
-        interfaces.append('eth0')
-    for v in cfg.get('vlans', []):
-        try:
-            vid = str(v.get('id'))
-            interfaces.append(f"eth0.{vid}")
-        except Exception:
-            pass
-    # Add wlan* interfaces
+
+def _write_report_from_live():
+    """Generate a report file using current live IP/ping data."""
+    cfg = get_effective_config()
+    ip_state = get_live_ip_state(cfg)
+    ping_state = get_live_ping_state(cfg)
+
+    now_ts = time.time()
+    now_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_ts))
+    fname = time.strftime("session-%Y%m%d-%H%M%S.txt", time.localtime(now_ts))
+
+    lines = []
+    lines.append("Tag Tapper Pi Session Report")
+    lines.append("")
+    lines.append(f"Zeitpunkt: {now_str}")
+    lines.append("")
+    lines.append("IPs:")
+    for item in ip_state.get('interfaces', []):
+        name = item.get('display_name') or item.get('iface') or '-'
+        ip = item.get('ip') or '-'
+        status = 'UP' if item.get('up') else 'DOWN'
+        lines.append(f"  {name:25}  {status:4}  {ip}")
+    lines.append("")
+    lines.append("Pings:")
+    results = ping_state.get('results', {})
+    interfaces = ping_state.get('interfaces', [])
+    targets = ping_state.get('targets', [])
+    if interfaces and targets:
+        for iface in interfaces:
+            lines.append(f"  [{iface}]")
+            for t in targets:
+                host = t.get('host')
+                label = t.get('name', host)
+                ok = (results.get(iface, {}).get(host, False))
+                state = "OK" if ok else "FAIL"
+                lines.append(f"    {label:20} {state} ({host})")
+    else:
+        lines.append("  (keine Ping-Daten)")
+
+    report_dir = ensure_report_dir()
+    fpath = os.path.join(report_dir, fname)
+    with open(fpath, 'w') as f:
+        f.write("\n".join(lines) + "\n")
+
+    # Set ownership to dietpi if available
     try:
-        out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
-        for line in out.splitlines():
-            parts = line.split(':', 2)
-            if len(parts) >= 2:
-                iface = parts[1].strip().split('@')[0]
-                if iface.startswith('wlan') or iface.startswith('wl'):
-                    if iface not in interfaces:
-                        interfaces.append(iface)
+        uid = pwd.getpwnam('dietpi').pw_uid
+        gid = grp.getgrnam('dietpi').gr_gid
+        os.chown(fpath, uid, gid)
     except Exception:
         pass
 
-    # Targets
-    targets = []
-    ping_cfg = cfg.get('pings', {})
-    timeout = int(ping_cfg.get('timeout', 2))
-    for p in ping_cfg.get('hosts', []):
-        host = p.get('host')
-        name = p.get('name', host)
-        if host:
-            targets.append({'host': host, 'name': name})
-
-    def interface_exists(iface):
-        try:
-            subprocess.check_output(['ip', 'link', 'show', 'dev', iface], stderr=subprocess.DEVNULL)
-            return True
-        except subprocess.CalledProcessError:
-            return False
-
-    def ping_single(iface, host):
-        """Ping single host from single interface. Returns (iface, host, reachable)."""
-        if not interface_exists(iface):
-            return (iface, host, False)
-        try:
-            result = subprocess.run(
-                ['ping', '-I', iface, '-c', '1', '-W', str(timeout), host],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=timeout + 1
-            )
-            return (iface, host, result.returncode == 0)
-        except (subprocess.TimeoutExpired, Exception):
-            return (iface, host, False)
-
-    # Collect all ping tasks
-    ping_tasks = []
-    for iface in interfaces:
-        for t in targets:
-            ping_tasks.append((iface, t['host']))
-
-    # Execute pings in parallel
-    results = {iface: {} for iface in interfaces}
-    max_workers = min(20, len(ping_tasks)) if ping_tasks else 1
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(ping_single, iface, host): (iface, host) 
-                   for iface, host in ping_tasks}
-        
-        for future in as_completed(futures):
-            iface, host, reachable = future.result()
-            results[iface][host] = reachable
-
-    return jsonify({
-        'interfaces': interfaces,
-        'targets': targets,
-        'results': results,
-        'timestamp': time.time()
-    })
+    return fname
 
 
 @app.route('/api/reports', methods=['GET'])
@@ -409,6 +467,17 @@ def delete_all_reports():
     except Exception as e:
         logger.error(f"Error deleting all reports: {e}")
         return jsonify({'error': 'Failed to delete reports'}), 500
+
+
+@app.route('/api/reports/create', methods=['POST'])
+def create_report():
+    """Create a new report using current live data."""
+    try:
+        name = _write_report_from_live()
+        return jsonify({'success': True, 'name': name})
+    except Exception as e:
+        logger.error(f"Error creating report: {e}")
+        return jsonify({'error': 'Failed to create report'}), 500
 
 
 if __name__ == '__main__':
