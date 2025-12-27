@@ -8,7 +8,13 @@ try:
 except Exception:
     pygame = None
 from config_loader import load_config
-from wifi_monitor import WiFiMonitor
+
+try:
+    from wifi_monitor import WiFiMonitor
+    WIFI_MONITOR_AVAILABLE = True
+except Exception:
+    WIFI_MONITOR_AVAILABLE = False
+    WiFiMonitor = None
 
 
 class TabRange:
@@ -22,8 +28,13 @@ class TabRange:
         self.update_interval = 5
         self.target_ssids = []
         
-        # WiFi state monitor (bandsteering, roaming)
-        self.wifi_monitor = WiFiMonitor(interface=self.interface)
+        # WiFi state monitor (bandsteering, roaming) - optional
+        self.wifi_monitor = None
+        if WIFI_MONITOR_AVAILABLE:
+            try:
+                self.wifi_monitor = WiFiMonitor(interface=self.interface)
+            except Exception:
+                pass
         
         # Load initial config
         self.refresh_config()
@@ -178,9 +189,15 @@ class TabRange:
             last_update = self.last_update
             update_times = dict(self.last_update_per_ssid)
         
-        # Get WiFi state for roaming/bandsteering info
-        wifi_state = self.wifi_monitor.get_state()
-        wifi_summary = self.wifi_monitor.get_summary()
+        # Get WiFi state for roaming/bandsteering info (optional)
+        wifi_state = None
+        wifi_summary = []
+        if self.wifi_monitor:
+            try:
+                wifi_state = self.wifi_monitor.get_state()
+                wifi_summary = self.wifi_monitor.get_summary()
+            except Exception:
+                pass
         
         if not ssids:
             # No SSIDs configured
@@ -266,7 +283,7 @@ class TabRange:
             surface.blit(percent_s, (percent_x, percent_y))
         
         # Draw WiFi state info (roaming, band, AP) at bottom
-        if wifi_state['ssid']:
+        if wifi_state and wifi_state.get('ssid'):
             info_y = rect.bottom - len(wifi_summary) * (small_font.get_height() + 3) - 5
             
             for line in wifi_summary:

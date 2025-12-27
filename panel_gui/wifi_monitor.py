@@ -11,7 +11,10 @@ import subprocess
 import threading
 import time
 import re
+import logging
 from collections import deque
+
+logger = logging.getLogger(__name__)
 
 
 class WiFiMonitor:
@@ -35,8 +38,11 @@ class WiFiMonitor:
         # Monitor thread
         self.stop_event = threading.Event()
         self.update_interval = 3
-        t = threading.Thread(target=self._monitor_loop, daemon=True)
-        t.start()
+        try:
+            t = threading.Thread(target=self._monitor_loop, daemon=True)
+            t.start()
+        except Exception as e:
+            logger.error(f"Failed to start WiFiMonitor thread: {e}")
     
     def _monitor_loop(self):
         """Background thread monitoring WiFi state."""
