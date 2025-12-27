@@ -515,40 +515,42 @@ def main():
                 if app.exec_after_anim is not None and app.anim_start is not None:
                     if time.time() - app.anim_start >= app.anim_duration:
                         tabid = app.exec_after_anim
-                        logging.info(f"Pre-exec animation complete for {tabid}; performing cleanup and executing")
-                        # stop touch thread
-                        stop_event.set()
-                        try:
-                            t.join(timeout=2)
-                        except Exception:
-                            pass
-                        # close framebuffer
-                        try:
-                            fbw.close()
-                        except Exception:
-                            pass
-                        # quit pygame
-                        try:
-                            pygame.quit()
-                        except Exception:
-                            pass
-                        # execute action
+                        logging.info(f"Pre-exec animation complete for {tabid}; executing action")
+                        
+                        # Execute action
                         try:
                             if tabid == 'report':
-                                # Write report and continue running
+                                # Write report and continue running (no cleanup needed)
                                 logging.info("Writing session report now")
                                 if getattr(app, 'session_reporter', None):
                                     app.session_reporter.write_report_now()
                                 # Reset animation state and continue
                                 app.exec_after_anim = None
                                 app.anim_start = None
-                            elif tabid == 'reboot':
-                                subprocess.Popen(['sudo', 'reboot'])
-                                time.sleep(0.3)
-                                running = False
-                                break
-                            elif tabid == 'shutdown':
-                                subprocess.Popen(['sudo', 'poweroff'])
+                            elif tabid in ('reboot', 'shutdown'):
+                                # Cleanup before system action
+                                logging.info(f"Performing cleanup before {tabid}")
+                                # stop touch thread
+                                stop_event.set()
+                                try:
+                                    t.join(timeout=2)
+                                except Exception:
+                                    pass
+                                # close framebuffer
+                                try:
+                                    fbw.close()
+                                except Exception:
+                                    pass
+                                # quit pygame
+                                try:
+                                    pygame.quit()
+                                except Exception:
+                                    pass
+                                # execute system action
+                                if tabid == 'reboot':
+                                    subprocess.Popen(['sudo', 'reboot'])
+                                elif tabid == 'shutdown':
+                                    subprocess.Popen(['sudo', 'poweroff'])
                                 time.sleep(0.3)
                                 running = False
                                 break
