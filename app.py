@@ -228,7 +228,7 @@ class TagTapperApp:
 
         # Session reporter: writes reports on demand
         try:
-            from tagtapperpi_comp.session_reporter import SessionReporter
+            from GUI.session_reporter import SessionReporter
             ip_comp = self.components.get('ip')
             ping_comp = self.components.get('ping')
             if ip_comp and ping_comp:
@@ -359,12 +359,12 @@ def main():
     calib = load_touch_calibration()
     logging.info(f"Calibration: X={calib['raw_x_min']}-{calib['raw_x_max']} Y={calib['raw_y_min']}-{calib['raw_y_max']}")
 
-    # Start touch monitoring thread (delegated to tagtapperpi_comp.touch)
+    # Start touch monitoring thread (delegated to GUI.touch)
     touch_queue = queue.Queue()
     stop_event = threading.Event()
     t = None
     try:
-        from tagtapperpi_comp import touch as touch_module
+        from GUI.touch import touch as touch_module
         t = touch_module.start_touch_monitor(touch_queue, TOUCH_PATH, stop_event)
     except Exception as e:
         logging.error(f"Failed to start touch monitor: {e}")
