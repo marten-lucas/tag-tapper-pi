@@ -7,10 +7,7 @@ try:
     import pygame
 except Exception:
     pygame = None
-try:
-    import yaml
-except Exception:
-    yaml = None
+from panel_gui.config_loader import load_config
 
 
 class TabIP:
@@ -93,15 +90,9 @@ class TabIP:
             self.cached_up = ups
             self.cached_vlan_names = vlan_names
     def load_vlan_names(self):
-        # repo root is parent of GUI folder
-        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cfg_path = os.path.join(repo, 'config.yaml')
         names = {}
-        if not yaml:
-            return names
         try:
-            with open(cfg_path, 'r') as f:
-                cfg = yaml.safe_load(f) or {}
+            cfg = load_config()
             for v in cfg.get('vlans', []):
                 vid = str(v.get('id'))
                 name = v.get('name') or v.get('name', '')

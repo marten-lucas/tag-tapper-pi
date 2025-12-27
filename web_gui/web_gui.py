@@ -6,17 +6,19 @@ User-specific changes are saved to /mnt/dietpi_userdata/config_overrides.yaml
 
 import os
 import sys
-import yaml
 import logging
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify
-from functools import wraps
+
+# Add parent to path for imports
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO_ROOT)
+
+from tagtapperpi_comp.config_loader import load_base_config, load_user_overrides, merge_configs, load_config, OVERRIDE_CONFIG_PATH
 
 # Configuration paths
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
 USERDATA_DIR = "/mnt/dietpi_userdata"
-OVERRIDES_PATH = os.path.join(USERDATA_DIR, "config_overrides.yaml")
 
 # Ensure userdata directory exists
 os.makedirs(USERDATA_DIR, exist_ok=True)
@@ -30,34 +32,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
-
-
-def load_base_config():
-    """Load the base config.yaml from repo."""
-    try:
-        with open(CONFIG_PATH, 'r') as f:
-            return yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.error(f"Failed to load base config: {e}")
-        return {}
-
-
-def load_user_overrides():
-    """Load user-specific config overrides."""
-    if not os.path.exists(OVERRIDES_PATH):
-        return {}
-    try:
-        with open(OVERRIDES_PATH, 'r') as f:
-            return yaml.safe_load(f) or {}
-    except Exception as e:
-        logger.error(f"Failed to load user overrides: {e}")
-        return {}
-
-
-def merge_configs(base, overrides):
-    """Recursively merge override config into base config."""
-    result = base.copy()
-    for key, value in overrides.items():
         if isinstance(value, dict) and key in result and isinstance(result[key], dict):
             result[key] = merge_configs(result[key], value)
         else:
@@ -78,6 +52,24 @@ def save_user_config(config):
         with open(OVERRIDES_PATH, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
         logger.info(f"User config saved to {OVERRIDES_PATH}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save user config: {e}")
+        return False
+
+
+def get_effective_config():
+    """Get the merged config (base + user overrides)."""
+    return load_config()
+
+
+def save_user_config(config):
+    """Save user config to overrides file."""
+    try:
+        import yaml
+        with open(OVERRIDE_CONFIG_PATH, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+        logger.info(f"Saved user overrides to {OVERRIDE_CONFIG_PATH}")
         return True
     except Exception as e:
         logger.error(f"Failed to save user config: {e}")
@@ -136,8 +128,8 @@ def update_config():
 def reset_config():
     """Reset user config to base (delete overrides)."""
     try:
-        if os.path.exists(OVERRIDES_PATH):
-            os.remove(OVERRIDES_PATH)
+        if os.path.exists(OVERRIDE_CONFIG_PATH):
+            os.remove(OVERRIDE_CONFIG_PATH)
             logger.info("User config reset to base")
             return jsonify({'success': True, 'message': 'Config reset to base'})
         return jsonify({'success': True, 'message': 'No overrides to reset'})
@@ -155,6 +147,6 @@ def health():
 if __name__ == '__main__':
     logger.info(f"Starting Web Config Editor")
     logger.info(f"Base config: {CONFIG_PATH}")
-    logger.info(f"User overrides: {OVERRIDES_PATH}")
+    logger.info(f"User overrides: {OVERRIDE_CONFIG_PATH}")
     # Run on all interfaces, port 5000
     app.run(host='0.0.0.0', port=5000, debug=False)

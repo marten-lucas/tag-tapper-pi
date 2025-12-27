@@ -1,7 +1,7 @@
 import os
 import time
 import threading
-import yaml
+from tagtapperpi_comp.config_loader import load_config
 
 
 class SessionReporter:
@@ -14,23 +14,17 @@ class SessionReporter:
         Reports will be saved under `<report_path>/tag-tapper-pi-reports/`.
     """
 
-    def __init__(self, tab_ip, tab_ping, config_path="/home/dietpi/tag-tapper-pi/config.yaml"):
+    def __init__(self, tab_ip, tab_ping):
         self.tab_ip = tab_ip
         self.tab_ping = tab_ping
-        self.config_path = config_path
         self.report_dir = None
 
         self._load_config()
         self._ensure_report_dir()
 
     def _load_config(self):
-        base_path = None
-        try:
-            with open(self.config_path, "r") as f:
-                cfg = yaml.safe_load(f) or {}
-                base_path = cfg.get("report_path")
-        except Exception:
-            base_path = None
+        cfg = load_config()
+        base_path = cfg.get("report_path")
         # Fallback: repo root
         if not base_path:
             repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

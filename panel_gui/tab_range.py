@@ -7,10 +7,7 @@ try:
     import pygame
 except Exception:
     pygame = None
-try:
-    import yaml
-except Exception:
-    yaml = None
+from panel_gui.config_loader import load_config
 
 
 class TabRange:
@@ -39,15 +36,11 @@ class TabRange:
     
     def refresh_config(self):
         """Load scanning config from config.yaml."""
-        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cfg_path = os.path.join(repo, 'config.yaml')
-        
-        if not yaml:
+        if self is None:
             return
         
         try:
-            with open(cfg_path, 'r') as f:
-                cfg = yaml.safe_load(f) or {}
+            cfg = load_config()
             
             scanner_cfg = cfg.get('range_scanner', {})
             self.interface = scanner_cfg.get('interface', 'wlan0')

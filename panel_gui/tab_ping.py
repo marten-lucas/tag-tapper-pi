@@ -6,10 +6,7 @@ try:
     import pygame
 except Exception:
     pygame = None
-try:
-    import yaml
-except Exception:
-    yaml = None
+from panel_gui.config_loader import load_config
 
 
 class TabPing:
@@ -32,18 +29,11 @@ class TabPing:
 
     def refresh_config(self):
         """Load interfaces and ping targets from config.yaml."""
-        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        cfg_path = os.path.join(repo, 'config.yaml')
-        
         interfaces = []
         targets = []
         
-        if not yaml:
-            return
-        
         try:
-            with open(cfg_path, 'r') as f:
-                cfg = yaml.safe_load(f) or {}
+            cfg = load_config()
             
             # Get ping monitor settings from pings section
             ping_cfg = cfg.get('pings', {})
