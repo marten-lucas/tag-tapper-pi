@@ -33,8 +33,11 @@ class TabRange:
         if WIFI_MONITOR_AVAILABLE:
             try:
                 self.wifi_monitor = WiFiMonitor(interface=self.interface)
-            except Exception:
-                pass
+                import logging
+                logging.info(f"WiFiMonitor initialized: {self.wifi_monitor}")
+            except Exception as e:
+                import logging
+                logging.error(f"WiFiMonitor init failed: {e}", exc_info=True)
         
         # Track AP changes for toast messages
         self.last_ap_mac = None
@@ -199,8 +202,11 @@ class TabRange:
         if self.wifi_monitor:
             try:
                 wifi_state = self.wifi_monitor.get_state()
-            except Exception:
-                pass
+                import logging
+                logging.info(f"WiFi state: {wifi_state}")
+            except Exception as e:
+                import logging
+                logging.error(f"WiFi state error: {e}")
         
         # Track AP changes for toast
         if wifi_state and wifi_state.get('ap_mac'):
@@ -228,10 +234,13 @@ class TabRange:
         start_y = rect.top + 30
         
         # Draw each SSID with signal bar
+        import logging
+        logging.info(f"Drawing {len(ssids)} SSIDs. Connected: {connected}. WiFi state available: {wifi_state is not None}")
         for i, ssid in enumerate(ssids):
             y = start_y + i * bar_spacing
             signal = signals.get(ssid, 0)
             is_connected = (ssid == connected)
+            logging.info(f"  SSID {ssid}: signal={signal}%, is_connected={is_connected}")
             
             # Draw SSID name + frequency (in parentheses) with connection indicator
             ssid_display = ssid
@@ -289,6 +298,8 @@ class TabRange:
             
             # Draw AP info and RX speed inside the bar (only for connected SSID)
             if is_connected and wifi_state:
+                import logging
+                logging.info(f"Drawing AP info: {wifi_state}")
                 info_parts = []
                 if wifi_state.get('ap_mac'):
                     # Show last 6 chars of MAC for brevity
@@ -297,12 +308,14 @@ class TabRange:
                 if wifi_state.get('signal_dbm') is not None:
                     info_parts.append(f"{wifi_state['signal_dbm']}dBm")
                 
+                logging.info(f"Info parts: {info_parts}, small_font: {small_font}")
                 if info_parts:
                     info_text = " | ".join(info_parts)
                     info_s = small_font.render(info_text, True, styles.TEXT_COLOR)
                     info_x = start_x + 8
                     info_y = bar_y + (bar_height - small_font.get_height()) // 2
                     surface.blit(info_s, (info_x, info_y))
+                    logging.info(f"Blitted AP info: {info_text} at ({info_x}, {info_y})")
             
             # Draw signal percentage text on the right
             percent_text = f"{signal}%"
