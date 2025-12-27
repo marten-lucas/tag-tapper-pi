@@ -182,8 +182,8 @@ class TagTapperApp:
     TABS = [
         {"id": "ip", "label": "IP"},
         {"id": "ping", "label": "Ping"},
-        {"id": "range", "label": "Range"},
         {"id": "report", "label": "Report"},
+        {"id": "range", "label": "Range"},
         {"id": "reboot", "label": "Reboot"},
         {"id": "shutdown", "label": "Shutdown"}
     ]
