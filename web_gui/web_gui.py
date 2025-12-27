@@ -14,7 +14,7 @@ from flask import Flask, render_template, request, jsonify
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
-from tagtapperpi_comp.config_loader import load_base_config, load_user_overrides, merge_configs, load_config, OVERRIDE_CONFIG_PATH
+from config_loader import load_base_config, load_user_overrides, merge_configs, load_config, OVERRIDE_CONFIG_PATH
 
 # Configuration paths
 CONFIG_PATH = os.path.join(REPO_ROOT, "config.yaml")
@@ -32,32 +32,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
-        if isinstance(value, dict) and key in result and isinstance(result[key], dict):
-            result[key] = merge_configs(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def get_effective_config():
-    """Get the merged config (base + user overrides)."""
-    base = load_base_config()
-    overrides = load_user_overrides()
-    return merge_configs(base, overrides)
-
-
-def save_user_config(config):
-    """Save user-specific changes to overrides file."""
-    try:
-        with open(OVERRIDES_PATH, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-        logger.info(f"User config saved to {OVERRIDES_PATH}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save user config: {e}")
-        return False
-
-
 def get_effective_config():
     """Get the merged config (base + user overrides)."""
     return load_config()
