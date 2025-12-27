@@ -219,11 +219,8 @@ class TabPing:
         if last_update:
             elapsed = time.time() - last_update
             if elapsed < 3:
-                # Show "Updated" message for 3 seconds after update
-                # Use simple text (no Unicode check mark as bitmap font doesn't support it)
+                # Show toast for 3 seconds after update (IP-style)
                 try:
-                    update_msg = table_font.render("-- Aktualisiert --", True, styles.OK_COLOR)
-                    update_rect = update_msg.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
-                    surface.blit(update_msg, update_rect)
+                    styles.draw_toast(surface, rect, fonts, "Aktualisiert")
                 except Exception:
                     pass

@@ -243,10 +243,8 @@ class TabRange:
         if last_update:
             elapsed = time.time() - last_update
             if elapsed < 3:
-                # Show "Updated" message for 3 seconds after scan
+                # Show toast for 3 seconds after scan (IP-style)
                 try:
-                    update_msg = label_font.render("* Gescannt", True, styles.OK_COLOR)
-                    update_rect = update_msg.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
-                    surface.blit(update_msg, update_rect)
+                    styles.draw_toast(surface, rect, fonts, "Gescannt")
                 except Exception:
                     pass

@@ -254,19 +254,7 @@ class TabIP:
             elapsed = time.time() - self.toast_time
             if elapsed < 3:  # Show for 3 seconds
                 try:
-                    toast_font = fonts.get('content', table_font)
-                    toast_text = toast_font.render(self.toast_message, True, styles.OK_COLOR)
-                    toast_rect = toast_text.get_rect()
-                    toast_x = rect.centerx - toast_rect.width // 2
-                    toast_y = rect.bottom - 60
-                    # Draw semi-transparent background
-                    bg_rect = pygame.Rect(toast_x - 12, toast_y - 4, toast_rect.width + 24, toast_rect.height + 8)
-                    toast_surface = pygame.Surface((bg_rect.width, bg_rect.height))
-                    toast_surface.set_alpha(200)
-                    toast_surface.fill((20, 20, 20))
-                    surface.blit(toast_surface, bg_rect.topleft)
-                    # Draw text
-                    surface.blit(toast_text, (toast_x, toast_y))
+                    styles.draw_toast(surface, rect, fonts, self.toast_message)
                 except Exception:
                     pass
             else:

@@ -37,3 +37,34 @@ def load_fonts():
         'content': pygame.font.Font(None, CONTENT_FONT_SIZE),
         'small': pygame.font.Font(None, SMALL_FONT_SIZE),
     }
+
+
+def draw_toast(surface, rect, fonts, message, color=OK_COLOR):
+    """Render a toast message using the IP tab's style.
+
+    - Semi-transparent dark rounded rectangle (simple rect here)
+    - Centered near the bottom of the provided content rect
+    - Text in success color by default
+    """
+    try:
+        toast_font = fonts.get('content', fonts['content'])
+        toast_text = toast_font.render(message, True, color)
+        toast_rect = toast_text.get_rect()
+        toast_x = rect.centerx - toast_rect.width // 2
+        toast_y = rect.bottom - 60
+        bg_rect = pygame.Rect(toast_x - 12, toast_y - 4, toast_rect.width + 24, toast_rect.height + 8)
+        # Background with alpha
+        toast_surface = pygame.Surface((bg_rect.width, bg_rect.height))
+        toast_surface.set_alpha(200)
+        toast_surface.fill((20, 20, 20))
+        surface.blit(toast_surface, bg_rect.topleft)
+        # Text
+        surface.blit(toast_text, (toast_x, toast_y))
+    except Exception:
+        # Fallback: plain text centered at bottom
+        try:
+            toast_font = fonts.get('content', fonts['content'])
+            toast_text = toast_font.render(message, True, color)
+            surface.blit(toast_text, toast_text.get_rect(center=(rect.centerx, rect.bottom - 60)))
+        except Exception:
+            pass
