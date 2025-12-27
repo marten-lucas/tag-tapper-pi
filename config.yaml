@@ -25,4 +25,4 @@ range_scanner:
     - name: "Kita Gramschatz"
     - name: "ShellyPlus1-D4D4DAF4B6B0"
 
-report_path: "/mnt/dietpi_userdata/downloads/tag-tapper-pi-reports"
+report_path: "/mnt/dietpi_userdata/downloads/"

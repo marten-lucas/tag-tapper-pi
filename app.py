@@ -183,6 +183,7 @@ class TagTapperApp:
         {"id": "ip", "label": "IP"},
         {"id": "ping", "label": "Ping"},
         {"id": "range", "label": "Range"},
+        {"id": "report", "label": "Report"},
         {"id": "reboot", "label": "Reboot"},
         {"id": "shutdown", "label": "Shutdown"}
     ]
@@ -218,20 +219,20 @@ class TagTapperApp:
                 'ip': tab_ip.TabIP(),
                 'ping': tab_ping.TabPing(),
                 'range': tab_range.TabRange(),
+                'report': action.ActionTab('report'),
                 'reboot': action.ActionTab('reboot'),
                 'shutdown': action.ActionTab('shutdown'),
             }
         except Exception:
             self.components = {}
 
-        # Session reporter: monitors eth0 UP/DOWN and writes reports
+        # Session reporter: writes reports on demand
         try:
             from tagtapperpi_comp.session_reporter import SessionReporter
             ip_comp = self.components.get('ip')
             ping_comp = self.components.get('ping')
             if ip_comp and ping_comp:
                 self.session_reporter = SessionReporter(ip_comp, ping_comp)
-                self.session_reporter.start()
             else:
                 self.session_reporter = None
         except Exception:
@@ -387,15 +388,18 @@ def main():
                         val = ev[1]
                         if val == 1:  # Press
                             touched = True
-                            # Start long-press only for action tabs
+                            # Start long-press for action tabs (report, reboot, shutdown)
                             try:
-                                if app.TABS[app.active_tab]["id"] in ("reboot", "shutdown"):
+                                tab_id = app.TABS[app.active_tab]["id"]
+                                if tab_id in ("report", "reboot", "shutdown"):
                                     app.long_press_start_time = time.time()
                                     app.long_press_target = app.active_tab
                                     app.long_press_progress = 0.0
                                     app.long_press_executed = False
                                     app.suppress_next_release = False
-                                    logging.info(f"Long-press START for tab {app.TABS[app.active_tab]['id']}")
+                                    # Set duration based on tab
+                                    app.long_press_duration = 2.0 if tab_id == "report" else 5.0
+                                    logging.info(f"Long-press START for tab {tab_id} (duration={app.long_press_duration}s)")
                             except Exception:
                                 pass
                         else:  # Release
@@ -406,8 +410,12 @@ def main():
                             try:
                                 if app.long_press_executed:
                                     was_hold = True
-                                elif app.long_press_start_time is not None and (now_rel - app.long_press_start_time) >= app.long_press_duration:
-                                    was_hold = True
+                                elif app.long_press_start_time is not None:
+                                    # Check duration based on tab type
+                                    tab_id = app.TABS[app.active_tab]["id"]
+                                    required_duration = 2.0 if tab_id == "report" else 5.0
+                                    if (now_rel - app.long_press_start_time) >= required_duration:
+                                        was_hold = True
                                 elif app.exec_after_anim is not None:
                                     was_hold = True
                                 elif getattr(app, 'suppress_next_release', False):
@@ -524,18 +532,28 @@ def main():
                             pygame.quit()
                         except Exception:
                             pass
-                        # execute system action
+                        # execute action
                         try:
-                            if tabid == 'reboot':
+                            if tabid == 'report':
+                                # Write report and continue running
+                                logging.info("Writing session report now")
+                                if getattr(app, 'session_reporter', None):
+                                    app.session_reporter.write_report_now()
+                                # Reset animation state and continue
+                                app.exec_after_anim = None
+                                app.anim_start = None
+                            elif tabid == 'reboot':
                                 subprocess.Popen(['sudo', 'reboot'])
+                                time.sleep(0.3)
+                                running = False
+                                break
                             elif tabid == 'shutdown':
                                 subprocess.Popen(['sudo', 'poweroff'])
+                                time.sleep(0.3)
+                                running = False
+                                break
                         except Exception as e:
                             logging.error(f"Failed to execute {tabid}: {e}")
-                        # short delay then exit loop
-                        time.sleep(0.3)
-                        running = False
-                        break
             except Exception:
                 pass
             
@@ -556,12 +574,6 @@ def main():
             pass
         try:
             pygame.quit()
-        except Exception:
-            pass
-        # Stop session reporter
-        try:
-            if getattr(app, 'session_reporter', None):
-                app.session_reporter.stop()
         except Exception:
             pass
 

@@ -87,7 +87,9 @@ Die App läuft auf TTY1 (physisches Display). SSH-Verbindungen nutzen separate T
 
 ## Session-Reports
 
-Bei jeder LAN-Session (eth0-Kabel von eingesteckt bis abgezogen) wird ein Text-Report geschrieben, der die im Panel angezeigten IPs und Ping-Ergebnisse protokolliert.
+Auf Seite 3 ("Report") kann ein Text-Report mit den aktuellen Panel-Daten erstellt werden:
+- **Geste:** 2 Sekunden halten (Hold), um Report zu schreiben.
+- **Inhalt:** IP-Tabelle (Status + IP) und Ping-Matrix (OK/FAIL je Ziel und Interface).
 
 - Pfad konfigurieren in `config.yaml`:
 
@@ -97,8 +99,7 @@ report_path: "/home/dietpi"
 ```
 
 - Reports werden unter `<report_path>/tag-tapper-pi-reports/` abgelegt.
-- Dateiname: `session-YYYYMMDD-HHMMSS.txt` (Zeitpunkt des Session-Beginns).
-- Inhalt: IP-Tabelle (Status + IP) und Ping-Matrix (OK/FAIL je Ziel und Interface).
+- Dateiname: `session-YYYYMMDD-HHMMSS.txt` (Zeitpunkt der Erstellung).
 
 ## Entwicklung
 

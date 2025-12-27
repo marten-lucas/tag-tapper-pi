@@ -5,8 +5,7 @@ import yaml
 
 
 class SessionReporter:
-    """Monitors `eth0` link state and writes a session report when the cable
-    is unplugged (transition UP -> DOWN). A session starts when eth0 becomes UP.
+    """Writes a session report on demand with current panel data.
 
     The report mirrors panel data: IP table and ping matrix.
 
@@ -20,11 +19,6 @@ class SessionReporter:
         self.tab_ping = tab_ping
         self.config_path = config_path
         self.report_dir = None
-        self._stop = threading.Event()
-        self._thread = None
-
-        self._session_active = False
-        self._session_start_ts = None
 
         self._load_config()
         self._ensure_report_dir()
@@ -49,52 +43,12 @@ class SessionReporter:
         except Exception:
             pass
 
-    def start(self):
-        if self._thread:
-            return
-        self._thread = threading.Thread(target=self._loop, daemon=True)
-        self._thread.start()
-
-    def stop(self):
-        self._stop.set()
-        if self._thread:
-            try:
-                self._thread.join(timeout=1.0)
-            except Exception:
-                pass
-
-    def _loop(self):
-        prev_up = None
-        while not self._stop.is_set():
-            up = False
-            # Read cached link state from TabIP
-            try:
-                with getattr(self.tab_ip, "_lock", threading.Lock()):
-                    ups = dict(getattr(self.tab_ip, "cached_up", {}))
-                up = bool(ups.get("eth0", False))
-            except Exception:
-                up = False
-
-            if prev_up is None:
-                prev_up = up
-
-            # Detect transitions
-            if not self._session_active and up and prev_up is False:
-                # Session start
-                self._session_active = True
-                self._session_start_ts = time.time()
-            elif self._session_active and (not up) and prev_up is True:
-                # Session end -> write report
-                try:
-                    self._write_report()
-                except Exception:
-                    pass
-                finally:
-                    self._session_active = False
-                    self._session_start_ts = None
-
-            prev_up = up
-            time.sleep(0.5)
+    def write_report_now(self):
+        """Write a report with current panel data."""
+        try:
+            self._write_report()
+        except Exception:
+            pass
 
     def _build_ip_rows(self):
         """Return list of tuples: (display_name, ip_text, status_text)"""
@@ -180,12 +134,10 @@ class SessionReporter:
         return matrix
 
     def _write_report(self):
-        # Filename: session-YYYYMMDD-HHMMSS.txt based on start time
-        start_ts = self._session_start_ts or time.time()
-        end_ts = time.time()
-        start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_ts))
-        end_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_ts))
-        fname = time.strftime("session-%Y%m%d-%H%M%S.txt", time.localtime(start_ts))
+        # Filename: session-YYYYMMDD-HHMMSS.txt based on current time
+        now_ts = time.time()
+        now_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now_ts))
+        fname = time.strftime("session-%Y%m%d-%H%M%S.txt", time.localtime(now_ts))
         fpath = os.path.join(self.report_dir, fname)
 
         ip_rows = self._build_ip_rows()
@@ -194,8 +146,7 @@ class SessionReporter:
         lines = []
         lines.append("Tag Tapper Pi Session Report")
         lines.append("")
-        lines.append(f"Start: {start_str}")
-        lines.append(f"Ende:  {end_str}")
+        lines.append(f"Zeitpunkt: {now_str}")
         lines.append("")
         lines.append("IPs:")
         for name, ip, status in ip_rows:
