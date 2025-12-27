@@ -21,7 +21,7 @@ sudo cp "${REPO_DIR}/networking/vlan-sync.service" /etc/systemd/system/vlan-sync
 
 # Install web config service
 echo "Installing web config service..."
-sudo cp "${REPO_DIR}/web-config.service" /etc/systemd/system/web-config.service || true
+sudo cp "${REPO_DIR}/web_gui/web-config.service" /etc/systemd/system/web-config.service || true
 
 sudo systemctl daemon-reload
 # Enable and start the vlan-sync service so it runs at boot and now

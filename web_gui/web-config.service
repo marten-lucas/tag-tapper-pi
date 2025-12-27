@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/home/dietpi/tag-tapper-pi
-ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/web_gui.py
+ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/web_gui/web_gui.py
 Restart=on-failure
 RestartSec=10
 
