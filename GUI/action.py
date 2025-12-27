@@ -44,3 +44,18 @@ class ActionTab:
         lbl = fonts['content'].render(label_txt, True, styles.ACCENT_COLOR)
         lbl_rect = lbl.get_rect(center=(cx, cy))
         surface.blit(lbl, lbl_rect)
+
+        # Show toast message if active (for report confirmation)
+        if self.action_id == 'report' and hasattr(app, 'action_toast_message'):
+            if app.action_toast_message:
+                elapsed = time.time() - getattr(app, 'action_toast_time', 0)
+                if elapsed < 3:  # Show for 3 seconds
+                    try:
+                        toast_font = fonts.get('content', fonts.get('tab_title'))
+                        toast_text = toast_font.render(app.action_toast_message, True, styles.OK_COLOR)
+                        toast_rect = toast_text.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
+                        surface.blit(toast_text, toast_rect)
+                    except Exception:
+                        pass
+                else:
+                    app.action_toast_message = None

@@ -19,6 +19,7 @@ class TabRange:
         self.signal_strengths = {}  # {ssid: signal_percent}
         self.connected_ssid = None
         self.last_update = None
+        self.last_update_per_ssid = {}  # {ssid: timestamp} for blink effect
         self.interface = 'wlan0'
         self.update_interval = 5
         self.target_ssids = []
@@ -86,11 +87,18 @@ class TabRange:
                     else:
                         signals[ssid] = 0  # Not visible
                 
-                # Update cache
+                # Update cache and track per-SSID changes
                 with self._lock:
+                    now = time.time()
+                    # Mark SSIDs that changed as updated
+                    for ssid in signals:
+                        old_signal = self.signal_strengths.get(ssid, -1)
+                        new_signal = signals[ssid]
+                        if old_signal != new_signal:
+                            self.last_update_per_ssid[ssid] = now
                     self.signal_strengths = signals
                     self.connected_ssid = connected
-                    self.last_update = time.time()
+                    self.last_update = now
             
             # Wait for next update cycle
             self.stop_event.wait(self.update_interval)
@@ -171,6 +179,7 @@ class TabRange:
             connected = self.connected_ssid
             ssids = list(self.target_ssids)
             last_update = self.last_update
+            update_times = dict(self.last_update_per_ssid)
         
         if not ssids:
             # No SSIDs configured
@@ -207,12 +216,27 @@ class TabRange:
             # Draw signal strength bar
             bar_y = y + ssid_font.get_height() + 4
             
+            # Check if this SSID was recently updated (within 0.5s for blink effect)
+            now = time.time()
+            ssid_updated = False
+            if ssid in update_times:
+                elapsed = now - update_times[ssid]
+                if elapsed < 0.5:  # Blink for 500ms
+                    ssid_updated = True
+            
             # Background bar (gray)
             bar_bg_rect = pygame.Rect(start_x, bar_y, bar_width, bar_height)
             try:
                 pygame.draw.rect(surface, styles.NEUTRAL_RING, bar_bg_rect)
             except Exception:
                 pass
+            
+            # Draw blink border if recently updated
+            if ssid_updated:
+                try:
+                    pygame.draw.rect(surface, styles.OK_COLOR, bar_bg_rect, 3)
+                except Exception:
+                    pass
             
             # Foreground bar (colored based on signal strength)
             # Always draw at least a 1px fill so 0% is visible
@@ -238,13 +262,3 @@ class TabRange:
             percent_x = start_x + bar_width + 10
             percent_y = bar_y + (bar_height - label_font.get_height()) // 2
             surface.blit(percent_s, (percent_x, percent_y))
-        
-        # Show last update time
-        if last_update:
-            elapsed = time.time() - last_update
-            if elapsed < 3:
-                # Show toast for 3 seconds after scan (IP-style)
-                try:
-                    styles.draw_toast(surface, rect, fonts, "Gescannt")
-                except Exception:
-                    pass

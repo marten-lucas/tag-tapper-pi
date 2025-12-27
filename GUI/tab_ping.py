@@ -45,6 +45,11 @@ class TabPing:
             with open(cfg_path, 'r') as f:
                 cfg = yaml.safe_load(f) or {}
             
+            # Get ping monitor settings from pings section
+            ping_cfg = cfg.get('pings', {})
+            self.update_interval = ping_cfg.get('update_interval', 10)
+            self.ping_timeout = ping_cfg.get('timeout', 2)
+            
             # Build interface list: eth0, VLANs, then wlan*
             interfaces.append('eth0')
             
@@ -65,8 +70,8 @@ class TabPing:
             except Exception:
                 pass
             
-            # Get ping targets
-            for p in cfg.get('pings', []):
+            # Get ping targets from hosts list
+            for p in ping_cfg.get('hosts', []):
                 host = p.get('host')
                 name = p.get('name', host)
                 if host:

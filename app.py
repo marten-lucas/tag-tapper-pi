@@ -258,6 +258,9 @@ class TagTapperApp:
         self.exec_after_anim = None
         self.anim_start = None
         self.anim_duration = 1.0  # seconds for pre-exec animation
+        # Toast message for action confirmations
+        self.action_toast_message = None
+        self.action_toast_time = 0
         
         
     
@@ -524,6 +527,9 @@ def main():
                                 logging.info("Writing session report now")
                                 if getattr(app, 'session_reporter', None):
                                     app.session_reporter.write_report_now()
+                                # Show confirmation toast
+                                app.action_toast_message = "Report geschrieben"
+                                app.action_toast_time = time.time()
                                 # Reset animation state and continue
                                 app.exec_after_anim = None
                                 app.anim_start = None

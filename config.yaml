@@ -8,15 +8,17 @@ vlans:
 - id: 178
   name: User
 pings:
-- host: 192.168.70.1
-  name: Server VLAN Gateway
-- host: 192.168.80.1
-  name: Jail VLAN Gateway
-- host: 172.16.100.1
-  name: Infra VLAN Gateway
-
-- host: 8.8.8.8
-  name: Google DNS
+  hosts:
+  - host: 192.168.70.1
+    name: Server VLAN Gateway
+  - host: 192.168.80.1
+    name: Jail VLAN Gateway
+  - host: 172.16.100.1
+    name: Infra VLAN Gateway
+  - host: 8.8.8.8
+    name: Google DNS
+  update_interval: 10 
+  timeout: 2 
 range_scanner:
   interface: wlan0
   update_interval: 2
