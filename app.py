@@ -9,8 +9,8 @@ import struct
 import yaml
 import numpy as np
 from collections import deque
-from GUI import styles
-from GUI import tabs as tabs_module
+from panel_gui import styles
+from panel_gui import tabs as tabs_module
 import subprocess
 
 try:
@@ -214,7 +214,7 @@ class TagTapperApp:
 
         # Components per tab (created lazily here)
         try:
-            from GUI import tab_ip, tab_ping, tab_range, action
+            from panel_gui import tab_ip, tab_ping, tab_range, action
             self.components = {
                 'ip': tab_ip.TabIP(),
                 'ping': tab_ping.TabPing(),
@@ -228,7 +228,7 @@ class TagTapperApp:
 
         # Session reporter: writes reports on demand
         try:
-            from GUI.session_reporter import SessionReporter
+            from panel_gui.session_reporter import SessionReporter
             ip_comp = self.components.get('ip')
             ping_comp = self.components.get('ping')
             if ip_comp and ping_comp:
@@ -364,7 +364,7 @@ def main():
     stop_event = threading.Event()
     t = None
     try:
-        from GUI.touch import touch as touch_module
+        from panel_gui.touch import touch as touch_module
         t = touch_module.start_touch_monitor(touch_queue, TOUCH_PATH, stop_event)
     except Exception as e:
         logging.error(f"Failed to start touch monitor: {e}")
