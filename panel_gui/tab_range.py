@@ -36,6 +36,11 @@ class TabRange:
             except Exception:
                 pass
         
+        # Track AP changes for toast messages
+        self.last_ap_mac = None
+        self.ap_changed = False
+        self.ap_change_time = None
+        
         # Load initial config
         self.refresh_config()
         
@@ -181,7 +186,7 @@ class TabRange:
             return int(((dbm + 90) / 60) * 100)
     
     def draw(self, surface, rect, app, styles, fonts):
-        """Draw WiFi signal strength bars and roaming/bandsteering info."""
+        """Draw WiFi signal strength bars with AP info inline."""
         with self._lock:
             signals = dict(self.signal_strengths)
             connected = self.connected_ssid
@@ -191,13 +196,18 @@ class TabRange:
         
         # Get WiFi state for roaming/bandsteering info (optional)
         wifi_state = None
-        wifi_summary = []
         if self.wifi_monitor:
             try:
                 wifi_state = self.wifi_monitor.get_state()
-                wifi_summary = self.wifi_monitor.get_summary()
             except Exception:
                 pass
+        
+        # Track AP changes for toast
+        if wifi_state and wifi_state.get('ap_mac'):
+            if self.last_ap_mac != wifi_state['ap_mac']:
+                self.ap_changed = True
+                self.ap_change_time = time.time()
+                self.last_ap_mac = wifi_state['ap_mac']
         
         if not ssids:
             # No SSIDs configured
@@ -210,9 +220,9 @@ class TabRange:
         label_font = fonts.get('header', fonts['content'])
         small_font = fonts.get('content', label_font)
         
-        # Calculate layout - reserve bottom area for WiFi info
+        # Calculate layout
         bar_height = 30
-        bar_spacing = 50
+        bar_spacing = 75  # Increased spacing between SSIDs
         bar_width = rect.width - 80
         start_x = rect.left + 20
         start_y = rect.top + 30
@@ -223,9 +233,12 @@ class TabRange:
             signal = signals.get(ssid, 0)
             is_connected = (ssid == connected)
             
-            # Draw SSID name with connection indicator
+            # Draw SSID name + frequency (in parentheses) with connection indicator
             ssid_display = ssid
-            if is_connected:
+            if is_connected and wifi_state and wifi_state.get('frequency_ghz'):
+                freq_str = f"{wifi_state['frequency_ghz']:.1f} GHz"
+                ssid_display = f"* {ssid} ({freq_str})"
+            elif is_connected:
                 ssid_display = f"* {ssid}"
             
             ssid_color = styles.TEXT_ACTIVE if is_connected else styles.TEXT_COLOR
@@ -258,7 +271,6 @@ class TabRange:
                     pass
             
             # Foreground bar (colored based on signal strength)
-            # Always draw at least a 1px fill so 0% is visible
             fill_width = max(1, int((signal / 100.0) * bar_width))
             bar_fill_rect = pygame.Rect(start_x, bar_y, fill_width, bar_height)
 
@@ -275,19 +287,41 @@ class TabRange:
             except Exception:
                 pass
             
-            # Draw signal percentage text on bar
+            # Draw AP info and RX speed inside the bar (only for connected SSID)
+            if is_connected and wifi_state:
+                info_parts = []
+                if wifi_state.get('ap_mac'):
+                    # Show last 6 chars of MAC for brevity
+                    mac_short = wifi_state['ap_mac'][-8:] if len(wifi_state['ap_mac']) >= 8 else wifi_state['ap_mac']
+                    info_parts.append(mac_short)
+                if wifi_state.get('signal_dbm') is not None:
+                    info_parts.append(f"{wifi_state['signal_dbm']}dBm")
+                
+                if info_parts:
+                    info_text = " | ".join(info_parts)
+                    info_s = small_font.render(info_text, True, styles.TEXT_COLOR)
+                    info_x = start_x + 8
+                    info_y = bar_y + (bar_height - small_font.get_height()) // 2
+                    surface.blit(info_s, (info_x, info_y))
+            
+            # Draw signal percentage text on the right
             percent_text = f"{signal}%"
             percent_s = label_font.render(percent_text, True, styles.TEXT_COLOR)
             percent_x = start_x + bar_width + 10
             percent_y = bar_y + (bar_height - label_font.get_height()) // 2
             surface.blit(percent_s, (percent_x, percent_y))
         
-        # Draw WiFi state info (roaming, band, AP) at bottom
-        if wifi_state and wifi_state.get('ssid'):
-            info_y = rect.bottom - len(wifi_summary) * (small_font.get_height() + 3) - 5
-            
-            for line in wifi_summary:
-                line_s = small_font.render(line, True, styles.TEXT_COLOR)
-                surface.blit(line_s, (start_x, info_y))
-                info_y += small_font.get_height() + 3
+        # Show AP change toast if recent
+        if self.ap_changed:
+            elapsed = time.time() - self.ap_change_time
+            if elapsed < 2:  # Show for 2 seconds
+                try:
+                    toast_font = fonts.get('content', fonts.get('tab_title'))
+                    toast_text = toast_font.render("🔄 AP gewechselt", True, styles.OK_COLOR)
+                    toast_rect = toast_text.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
+                    surface.blit(toast_text, toast_rect)
+                except Exception:
+                    pass
+            else:
+                self.ap_changed = False
 

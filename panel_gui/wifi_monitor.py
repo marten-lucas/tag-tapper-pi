@@ -99,7 +99,7 @@ class WiFiMonitor:
         """Get connected SSID via iwgetid."""
         try:
             out = subprocess.check_output(
-                ['iwgetid', self.interface, '-r'],
+                ['/usr/sbin/iwgetid', self.interface, '-r'],
                 stderr=subprocess.DEVNULL,
                 timeout=2
             ).decode('utf-8').strip()
@@ -111,13 +111,13 @@ class WiFiMonitor:
         """Get current frequency in GHz via iw link."""
         try:
             out = subprocess.check_output(
-                ['iw', self.interface, 'link'],
+                ['sudo', '/usr/sbin/iw', self.interface, 'link'],
                 stderr=subprocess.DEVNULL,
                 timeout=2
             ).decode('utf-8')
             
             # Look for "freq: 2437 MHz" or similar
-            match = re.search(r'freq: (\d+)\s*MHz', out)
+            match = re.search(r'freq: (\d+)\s*(?:MHz|mhz)?', out)
             if match:
                 freq_mhz = int(match.group(1))
                 # Convert MHz to GHz and determine band
@@ -135,7 +135,7 @@ class WiFiMonitor:
         """Get AP MAC address via iw link."""
         try:
             out = subprocess.check_output(
-                ['iw', self.interface, 'link'],
+                ['sudo', '/usr/sbin/iw', self.interface, 'link'],
                 stderr=subprocess.DEVNULL,
                 timeout=2
             ).decode('utf-8')
@@ -152,7 +152,7 @@ class WiFiMonitor:
         """Get signal level in dBm via iw link."""
         try:
             out = subprocess.check_output(
-                ['iw', self.interface, 'link'],
+                ['sudo', '/usr/sbin/iw', self.interface, 'link'],
                 stderr=subprocess.DEVNULL,
                 timeout=2
             ).decode('utf-8')
@@ -169,7 +169,7 @@ class WiFiMonitor:
         """Get link speed in Mbps via iw link."""
         try:
             out = subprocess.check_output(
-                ['iw', self.interface, 'link'],
+                ['sudo', '/usr/sbin/iw', self.interface, 'link'],
                 stderr=subprocess.DEVNULL,
                 timeout=2
             ).decode('utf-8')
