@@ -262,10 +262,11 @@
 
     <!-- Live Tab -->
     <div class="tab-content" id="live">
-        <div class="empty-tab">
+        <section>
             <h2>📊 Live-Daten</h2>
-            <p>Hier werden bald Live-Daten vom Panel angezeigt.</p>
-        </div>
+            <div id="liveIp"></div>
+            <div id="livePing" style="margin-top: 1rem;"></div>
+        </section>
     </div>
 
     <!-- Reports Tab -->
@@ -343,7 +344,7 @@
             container.innerHTML = '';
 
             const sorted = Object.entries(config)
-                .sort((a, b) => getSortKey(a[0], a[1]).localeCompare(getSortKey(b[0], b[1])))
+                .sort((a, b) => getSortKey(b[0], b[1]).localeCompare(getSortKey(a[0], a[1])))
                 .forEach(([key, value]) => {
                     const accordion = createAccordion(key, value, [key]);
                     container.appendChild(accordion);
@@ -357,11 +358,11 @@
 
             const header = document.createElement('button');
             header.type = 'button';
-            header.className = 'accordion-header active';
+            header.className = 'accordion-header';
             header.textContent = formatSectionName(name);
 
             const body = document.createElement('div');
-            body.className = 'accordion-body active';
+            body.className = 'accordion-body';
 
             // Visible section title inside the opened accordion
             const sectionTitle = document.createElement('h3');
@@ -662,8 +663,110 @@
             }
         }
 
+        // Live tab rendering
+        function renderLiveIp(data) {
+            const div = document.getElementById('liveIp');
+            const rows = data.interfaces || [];
+            let html = '<h3>Schnittstellen</h3>';
+            if (rows.length === 0) {
+                html += '<p style="color: var(--muted-color);">Keine Schnittstellen gefunden</p>';
+            } else {
+                html += '<table class="striped"><thead><tr><th>Schnittstelle</th><th>IP</th><th>Status</th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    const ip = r.ip ? r.ip : '-';
+                    const status = (r.up && r.ip) ? '🟢' : '🔴';
+                    html += `<tr><td>${r.display_name || r.iface}</td><td>${ip}</td><td style="text-align:center">${status}</td></tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            div.innerHTML = html;
+        }
+
+        function renderLiveIpError(error) {
+            const div = document.getElementById('liveIp');
+            div.innerHTML = '<h3>Schnittstellen</h3><p style="color: var(--del-color);">⚠️ Fehler beim Laden der Schnittstellen</p>';
+        }
+
+        function renderLiveIpLoading() {
+            const div = document.getElementById('liveIp');
+            div.innerHTML = '<h3>Schnittstellen</h3><p style="color: var(--muted-color);">Lädt...</p>';
+        }
+
+        function renderLivePing(data) {
+            const div = document.getElementById('livePing');
+            const ifaces = data.interfaces || [];
+            const targets = data.targets || [];
+            const results = data.results || {};
+            let html = '<h3>Ping</h3>';
+            if (!targets.length) {
+                html += '<p style="color: var(--muted-color);">Keine Ping-Ziele konfiguriert</p>';
+                div.innerHTML = html;
+                return;
+            }
+            html += '<table class="striped"><thead><tr><th>Ziel</th>';
+            ifaces.forEach(iface => {
+                const label = iface === 'eth0' ? 'eth0' : (iface.startsWith('eth0.') ? iface.replace('eth0.', '') : iface);
+                html += `<th>${label}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+            targets.forEach(t => {
+                html += `<tr><td>${t.name}</td>`;
+                ifaces.forEach(iface => {
+                    const reachable = (results[iface] || {})[t.host] ? '🟢' : '🔴';
+                    html += `<td style="text-align:center">${reachable}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            div.innerHTML = html;
+        }
+
+        function renderLivePingError(error) {
+            const div = document.getElementById('livePing');
+            div.innerHTML = '<h3>Ping</h3><p style="color: var(--del-color);">⚠️ Fehler beim Laden der Ping-Daten</p>';
+        }
+
+        function renderLivePingLoading() {
+            const div = document.getElementById('livePing');
+            div.innerHTML = '<h3>Ping</h3><p style="color: var(--muted-color);">Lädt...</p>';
+        }
+
+        function fetchLiveIp() {
+            renderLiveIpLoading();
+            fetch('/api/live/ip', { signal: AbortSignal.timeout(8000) })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(renderLiveIp)
+                .catch(err => {
+                    console.error('Live IP fetch failed:', err);
+                    renderLiveIpError(err);
+                });
+        }
+
+        function fetchLivePing() {
+            renderLivePingLoading();
+            fetch('/api/live/ping', { signal: AbortSignal.timeout(15000) })
+                .then(r => {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
+                .then(renderLivePing)
+                .catch(err => {
+                    console.error('Live Ping fetch failed:', err);
+                    renderLivePingError(err);
+                });
+        }
+
         // Load config on page load
         loadConfig();
+
+        // Start live data refresh
+        fetchLiveIp();
+        fetchLivePing();
+        setInterval(fetchLiveIp, 5000);
+        setInterval(fetchLivePing, 10000);
     </script>
 </body>
 
