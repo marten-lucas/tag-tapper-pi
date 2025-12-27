@@ -49,6 +49,8 @@ class SessionReporter:
     def write_report_now(self):
         """Write a report with current panel data."""
         try:
+            # Recreate missing report directory if it was deleted while the app is running
+            self._ensure_report_dir()
             self._write_report()
         except Exception:
             pass
@@ -113,9 +115,13 @@ class SessionReporter:
         except Exception:
             targets, results = [], {}
 
-        # Collect interfaces present in results
+        # Collect interfaces present in results (supports tuple-key and nested-dict shapes)
         interfaces = set()
-        for (iface, host), ok in results.items():
+        for key, val in results.items():
+            if isinstance(key, tuple) and len(key) == 2:
+                iface = key[0]
+            else:
+                iface = key
             interfaces.add(iface)
         # If results are empty, try to infer from TabIP
         if not interfaces:
@@ -131,7 +137,11 @@ class SessionReporter:
             row = []
             for target in targets:
                 host = target.get("host") if isinstance(target, dict) else str(target)
-                ok = bool(results.get((iface, host), False))
+                # Support nested dict results {iface: {host: bool}}
+                if isinstance(results.get(iface), dict):
+                    ok = bool(results.get(iface, {}).get(host, False))
+                else:
+                    ok = bool(results.get((iface, host), False))
                 row.append((host, ok))
             matrix[iface] = row
         return matrix
