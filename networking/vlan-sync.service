@@ -1,17 +1,17 @@
 [Unit]
 Description=Sync VLANs from config.yaml
-After=network-online.target
-Wants=network-online.target
+# Wir starten erst, wenn der langsame networking.service fertig ist
+After=networking.service
+# Wir wollen NICHT auf network-online warten, das dauert zu lange
+Before=multi-user.target
 
 [Service]
 Type=oneshot
-# Using absolute paths avoids unit-file parsing/expansion issues.
 Environment=VLAN_CONFIG=/home/dietpi/tag-tapper-pi/config.yaml
 WorkingDirectory=/home/dietpi/tag-tapper-pi
 ExecStart=/usr/bin/env python3 /home/dietpi/tag-tapper-pi/networking/sync_vlans.py
 RemainAfterExit=yes
 User=root
-Group=root
 
 [Install]
 WantedBy=multi-user.target
