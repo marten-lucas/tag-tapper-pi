@@ -18,17 +18,26 @@ echo "Installing VLAN sync service and scripts..."
 echo "Installing VLAN sync service (will use scripts in repo directory)..."
 # Install only the systemd unit; the service will ExecStart the script inside the repo.
 sudo cp "${REPO_DIR}/networking/vlan-sync.service" /etc/systemd/system/vlan-sync.service || true
+
+# Install web config service
+echo "Installing web config service..."
+sudo cp "${REPO_DIR}/web-config.service" /etc/systemd/system/web-config.service || true
+
 sudo systemctl daemon-reload
 # Enable and start the vlan-sync service so it runs at boot and now
 sudo systemctl enable --now vlan-sync.service || true
+
+# Enable and start the web-config service
+sudo systemctl enable --now web-config.service || true
 
 echo "Ensuring log file exists and is owned by 'dietpi'..."
 sudo touch "$LOG_FILE" || true
 sudo chown dietpi:dietpi "$LOG_FILE" || true
 
-echo "Restarting service $SERVICE_NAME"
+echo "Restarting services..."
 sudo systemctl restart "$SERVICE_NAME"
-sudo systemctl restart vlan-sync.service 
+sudo systemctl restart vlan-sync.service || true
+sudo systemctl restart web-config.service || true 
 
 
 echo "Tailing error log: $LOG_FILE"

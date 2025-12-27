@@ -1,0 +1,14 @@
+[Unit]
+Description=Tag Tapper Web Config Editor
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/dietpi/tag-tapper-pi
+ExecStart=/usr/bin/python3 /home/dietpi/tag-tapper-pi/web_gui.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

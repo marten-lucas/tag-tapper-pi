@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tag Tapper - Config Editor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pico@latest/pico.min.css">
+    <style>
+        body {
+            padding: 2rem;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .config-section {
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .config-section:last-child {
+            border-bottom: none;
+        }
+
+        .config-section h2 {
+            font-size: 1.2rem;
+            color: #444;
+            margin-bottom: 1rem;
+            margin-top: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .array-item {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid #0096ff;
+        }
+
+        .array-controls {
+            margin-top: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        button.remove {
+            background-color: #d32f2f;
+        }
+
+        button.add {
+            background-color: #388e3c;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0096ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🖥️ Tag Tapper Config Editor</h1>
+        <p class="subtitle">Bearbeite deine Konfiguration. Änderungen werden benutzerspezifisch gespeichert.</p>
+
+        <div id="alert" class="alert"></div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Speichern...</p>
+        </div>
+
+        <form id="configForm">
+            <div id="configContent"></div>
+
+            <div class="button-group">
+                <button type="submit" class="contrast">💾 Speichern</button>
+                <button type="button" id="resetBtn" class="outline">↺ Auf Standard zurücksetzen</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('configForm');
+        const configContent = document.getElementById('configContent');
+        const alertDiv = document.getElementById('alert');
+        const loadingDiv = document.getElementById('loading');
+        const resetBtn = document.getElementById('resetBtn');
+
+        let globalConfig = {};
+
+        // Show alert message
+        function showAlert(message, type = 'success') {
+            alertDiv.textContent = message;
+            alertDiv.className = `alert ${type} show`;
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        // Load config from API
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                if (!response.ok) throw new Error('Failed to load config');
+                globalConfig = await response.json();
+                renderConfig(globalConfig);
+                showAlert('Konfiguration geladen', 'success');
+            } catch (error) {
+                console.error('Error loading config:', error);
+                showAlert('Fehler beim Laden der Konfiguration', 'error');
+            }
+        }
+
+        // Render config sections
+        function renderConfig(config) {
+            configContent.innerHTML = '';
+
+            Object.entries(config).forEach(([key, value]) => {
+                const section = document.createElement('div');
+                section.className = 'config-section';
+
+                const title = document.createElement('h2');
+                title.textContent = formatSectionName(key);
+                section.appendChild(title);
+
+                section.appendChild(renderField(key, value));
+                configContent.appendChild(section);
+            });
+        }
+
+        // Format section names
+        function formatSectionName(key) {
+            return key
+                .split('_')
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' ');
+        }
+
+        // Render field based on type
+        function renderField(name, value, path = []) {
+            const container = document.createElement('div');
+            const currentPath = [...path, name];
+
+            if (Array.isArray(value)) {
+                container.className = 'form-group';
+                value.forEach((item, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'array-item';
+
+                    if (typeof item === 'object' && item !== null) {
+                        Object.entries(item).forEach(([key, val]) => {
+                            const field = document.createElement('div');
+                            field.style.marginBottom = '0.75rem';
+                            const label = document.createElement('label');
+                            label.textContent = formatSectionName(key);
+                            const input = document.createElement('input');
+                            input.type = typeof val === 'number' ? 'number' : 'text';
+                            input.value = val;
+                            input.dataset.path = JSON.stringify([...currentPath, index, key]);
+                            field.appendChild(label);
+                            field.appendChild(input);
+                            itemDiv.appendChild(field);
+                        });
+                    } else {
+                        const input = document.createElement('input');
+                        input.type = typeof item === 'number' ? 'number' : 'text';
+                        input.value = item;
+                        input.dataset.path = JSON.stringify([...currentPath, index]);
+                        itemDiv.appendChild(input);
+                    }
+
+                    const controls = document.createElement('div');
+                    controls.className = 'array-controls';
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = '🗑️ Entfernen';
+                    removeBtn.className = 'remove outline';
+                    removeBtn.onclick = () => removeArrayItem(currentPath, index);
+                    controls.appendChild(removeBtn);
+                    itemDiv.appendChild(controls);
+
+                    container.appendChild(itemDiv);
+                });
+
+                // Add button
+                const addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.textContent = '➕ Neuer Eintrag';
+                addBtn.className = 'add outline';
+                addBtn.onclick = () => addArrayItem(currentPath);
+                container.appendChild(addBtn);
+            } else if (typeof value === 'object' && value !== null) {
+                Object.entries(value).forEach(([key, val]) => {
+                    const field = renderField(key, val, currentPath);
+                    container.appendChild(field);
+                });
+            } else {
+                const field = document.createElement('div');
+                field.className = 'form-group';
+                const label = document.createElement('label');
+                label.textContent = formatSectionName(name);
+                const input = document.createElement('input');
+                input.type = typeof value === 'number' ? 'number' : 'text';
+                input.value = value;
+                input.dataset.path = JSON.stringify(currentPath);
+                field.appendChild(label);
+                field.appendChild(input);
+                container.appendChild(field);
+            }
+
+            return container;
+        }
+
+        // Remove array item
+        function removeArrayItem(path, index) {
+            const arr = getByPath(globalConfig, path);
+            if (Array.isArray(arr)) {
+                arr.splice(index, 1);
+                renderConfig(globalConfig);
+            }
+        }
+
+        // Add array item
+        function addArrayItem(path) {
+            const arr = getByPath(globalConfig, path);
+            if (Array.isArray(arr)) {
+                // Infer structure from first item or create empty object
+                const template = arr.length > 0 && typeof arr[0] === 'object' ? {} : '';
+                arr.push(template);
+                renderConfig(globalConfig);
+            }
+        }
+
+        // Get value by path
+        function getByPath(obj, path) {
+            return path.reduce((curr, key) => curr[key], obj);
+        }
+
+        // Set value by path
+        function setByPath(obj, path, value) {
+            let current = obj;
+            for (let i = 0; i < path.length - 1; i++) {
+                const key = path[i];
+                if (!(key in current)) {
+                    current[key] = {};
+                }
+                current = current[key];
+            }
+            current[path[path.length - 1]] = value;
+        }
+
+        // Collect form data
+        function collectFormData() {
+            const formData = {};
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(input => {
+                if (input.dataset.path) {
+                    const path = JSON.parse(input.dataset.path);
+                    const value = input.type === 'number' ? parseFloat(input.value) : input.value;
+                    setByPath(formData, path, value);
+                }
+            });
+            return formData;
+        }
+
+        // Save config
+        async function saveConfig(e) {
+            e.preventDefault();
+            const formData = collectFormData();
+
+            loadingDiv.style.display = 'block';
+            try {
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) throw new Error('Failed to save config');
+                const result = await response.json();
+                showAlert('Konfiguration erfolgreich gespeichert ✓', 'success');
+            } catch (error) {
+                console.error('Error saving config:', error);
+                showAlert('Fehler beim Speichern der Konfiguration', 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        // Reset config
+        async function resetConfig() {
+            if (!confirm('Wirklich auf die Standardkonfiguration zurücksetzen?')) return;
+
+            loadingDiv.style.display = 'block';
+            try {
+                const response = await fetch('/api/config/reset', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to reset config');
+                await loadConfig();
+                showAlert('Konfiguration auf Standard zurückgesetzt', 'success');
+            } catch (error) {
+                console.error('Error resetting config:', error);
+                showAlert('Fehler beim Zurücksetzen der Konfiguration', 'error');
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        // Event listeners
+        form.addEventListener('submit', saveConfig);
+        resetBtn.addEventListener('click', resetConfig);
+
+        // Load config on page load
+        loadConfig();
+    </script>
+</body>
+
+</html>

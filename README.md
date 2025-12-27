@@ -101,6 +101,27 @@ report_path: "/home/dietpi"
 - Reports werden unter `<report_path>/tag-tapper-pi-reports/` abgelegt.
 - Dateiname: `session-YYYYMMDD-HHMMSS.txt` (Zeitpunkt der Erstellung).
 
+## Web Config Editor
+
+Eine einfache Web-GUI zum Bearbeiten der `config.yaml` über den Browser.
+
+- **Zugriff:** `http://<pi-ip>:5000`
+- **Benutzerspezifische Änderungen:** Separate `config_overrides.yaml` in `/mnt/dietpi_userdata/`
+- **Update-sicher:** Benutzerkonfiguration bleibt über App-Updates erhalten
+- **Service:** `web-config.service` (wird durch `update.sh` verwaltet)
+
+### Aktivieren
+
+```bash
+sudo systemctl enable --now web-config.service
+```
+
+### Status prüfen
+
+```bash
+sudo systemctl status web-config.service
+```
+
 ## Entwicklung
 
 **Test auf dem lokalen Rechner:**
