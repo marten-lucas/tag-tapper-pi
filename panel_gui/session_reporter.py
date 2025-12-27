@@ -1,6 +1,8 @@
 import os
 import time
 import threading
+import pwd
+import grp
 from config_loader import load_config
 
 
@@ -34,6 +36,13 @@ class SessionReporter:
     def _ensure_report_dir(self):
         try:
             os.makedirs(self.report_dir, exist_ok=True)
+            # Ensure directory ownership belongs to 'dietpi' when possible
+            try:
+                uid = pwd.getpwnam('dietpi').pw_uid
+                gid = grp.getgrnam('dietpi').gr_gid
+                os.chown(self.report_dir, uid, gid)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -159,5 +168,12 @@ class SessionReporter:
         try:
             with open(fpath, "w") as f:
                 f.write("\n".join(lines) + "\n")
+            # Set ownership to 'dietpi' if running as root or different user
+            try:
+                uid = pwd.getpwnam('dietpi').pw_uid
+                gid = grp.getgrnam('dietpi').gr_gid
+                os.chown(fpath, uid, gid)
+            except Exception:
+                pass
         except Exception:
             pass
