@@ -1,20 +1,22 @@
 vlans:
-- id: 70
+- id: 12
   name: Server
-- id: 80
+- id: 99
   name: Jail
-- id: 100
+- id: 172
   name: Infra
-- id: 178
+- id: 168
   name: User
 pings:
   hosts:
-  - host: 192.168.70.1
+  - host: 10.12.12.1
     name: Server VLAN Gateway
-  - host: 192.168.80.1
+  - host: 10.12.99.1
     name: Jail VLAN Gateway
   - host: 172.16.100.1
     name: Infra VLAN Gateway
+  - host: 192.168.12.1
+    name: User VLAN Gateway
   - host: 8.8.8.8
     name: Google DNS
   update_interval: 10 
@@ -25,6 +27,6 @@ range_scanner:
   update_details: 5
   ssid:
     - name: "Spezialgelagertes Sonder-WLAN"
-    - name: "Kita Gramschatz"
+    - name: "Ahorn Kindergarten Gramschatz"
 
 report_path: "/mnt/dietpi_userdata/downloads/"
