@@ -14,19 +14,12 @@ echo "Updating service unit..."
 sudo cp ${SERVICE_NAME} /etc/systemd/system/${SERVICE_NAME}
 sudo chmod +x start.sh
 sudo systemctl daemon-reload
-echo "Installing VLAN sync service and scripts..."
-echo "Installing VLAN sync service (will use scripts in repo directory)..."
-# Install only the systemd unit; the service will ExecStart the script inside the repo.
-sudo cp "${REPO_DIR}/networking/vlan-sync.service" /etc/systemd/system/vlan-sync.service || true
 
 # Install web config service
 echo "Installing web config service..."
 sudo cp "${REPO_DIR}/web_gui/web-config.service" /etc/systemd/system/web-config.service || true
 
 sudo systemctl daemon-reload
-# Enable and start the vlan-sync service so it runs at boot and now
-sudo systemctl enable --now vlan-sync.service || true
-
 # Enable and start the web-config service
 sudo systemctl enable --now web-config.service || true
 
@@ -36,7 +29,6 @@ sudo chown dietpi:dietpi "$LOG_FILE" || true
 
 echo "Restarting services..."
 sudo systemctl restart "$SERVICE_NAME"
-sudo systemctl restart vlan-sync.service || true
 sudo systemctl restart web-config.service || true 
 
 

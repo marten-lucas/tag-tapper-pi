@@ -1,12 +1,3 @@
-vlans:
-- id: 12
-  name: Server
-- id: 99
-  name: Jail
-- id: 172
-  name: Infra
-- id: 168
-  name: User
 pings:
   hosts:
   - host: 10.12.12.1

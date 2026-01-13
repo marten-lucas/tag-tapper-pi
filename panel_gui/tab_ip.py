@@ -7,7 +7,6 @@ try:
     import pygame
 except Exception:
     pygame = None
-from config_loader import load_config
 
 
 class TabIP:
@@ -16,7 +15,6 @@ class TabIP:
         self.cached_ifaces = []
         self.cached_ips = {}
         self.cached_up = {}
-        self.cached_vlan_names = {}
         self.poll_interval = 2  # seconds between refreshes
         # Track previous state for change detection
         self.prev_up = {}
@@ -46,7 +44,6 @@ class TabIP:
             ifaces = self.get_all_interfaces()
         except Exception:
             ifaces = []
-        vlan_names = self.load_vlan_names()
         
         # Query interface info in parallel
         ips = {}
@@ -107,20 +104,6 @@ class TabIP:
             self.cached_ifaces = ifaces
             self.cached_ips = ips
             self.cached_up = ups
-            self.cached_vlan_names = vlan_names
-    def load_vlan_names(self):
-        names = {}
-        try:
-            cfg = load_config()
-            for v in cfg.get('vlans', []):
-                vid = str(v.get('id'))
-                name = v.get('name') or v.get('name', '')
-                if name:
-                    names[vid] = name
-        except Exception:
-            pass
-        return names
-
     def get_all_interfaces(self):
         out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
         names = []
@@ -164,23 +147,13 @@ class TabIP:
         # Use cached data updated by monitor thread for quick redraws
         with self._lock:
             ifaces = list(self.cached_ifaces)
-            vlan_names = dict(self.cached_vlan_names)
             ips = dict(self.cached_ips)
             ups = dict(self.cached_up)
 
-        # Build ordered candidate list: eth0, VLANs (by id), then wlan*
+        # Build ordered candidate list: eth0, then wlan*
         candidates = []
         if 'eth0' in ifaces:
             candidates.append('eth0')
-
-        vlans = [n for n in ifaces if '.' in n]
-        def vlan_key(name):
-            try:
-                return int(name.split('.')[-1])
-            except Exception:
-                return 0
-        for n in sorted(vlans, key=vlan_key):
-            candidates.append(n)
 
         for n in sorted(ifaces):
             if n.startswith('wlan') or n.startswith('wl'):
@@ -219,11 +192,7 @@ class TabIP:
             up = ups.get(iface, False)
 
             display_name = iface
-            if '.' in iface:
-                vid = iface.split('.')[-1]
-                if vid in vlan_names:
-                    display_name = f"{iface} {vlan_names[vid]}"
-            elif iface.startswith('wlan') or iface.startswith('wl'):
+            if iface.startswith('wlan') or iface.startswith('wl'):
                 # Add SSID for wifi interfaces if available
                 ssid = self.get_wifi_ssid(iface)
                 if ssid:
