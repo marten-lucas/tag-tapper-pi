@@ -18,6 +18,7 @@ class TabPing:
         self.ping_targets = []
         self.update_interval = 10  # seconds
         self.ping_timeout = 2  # seconds
+        self.gateway_map = {}  # {interface: gateway_ip}
         
         # Load initial config
         self.refresh_config()
@@ -66,9 +67,35 @@ class TabPing:
         except Exception:
             pass
         
+        # Get gateway IPs for each interface
+        gateway_map = self._get_gateways(interfaces)
+        
         with self._lock:
             self.interfaces = interfaces
             self.ping_targets = targets
+            self.gateway_map = gateway_map
+
+    def _get_gateways(self, interfaces):
+        """Extract gateway IPs for each interface from ip route output."""
+        gateway_map = {}
+        try:
+            out = subprocess.check_output(['ip', 'route']).decode('utf-8')
+            for line in out.splitlines():
+                parts = line.split()
+                if 'dev' in parts:
+                    dev_idx = parts.index('dev')
+                    if dev_idx + 1 < len(parts):
+                        iface = parts[dev_idx + 1]
+                        if iface in interfaces:
+                            # Look for 'via' keyword to get gateway IP
+                            if 'via' in parts:
+                                via_idx = parts.index('via')
+                                if via_idx + 1 < len(parts):
+                                    gateway = parts[via_idx + 1]
+                                    gateway_map[iface] = gateway
+        except Exception:
+            pass
+        return gateway_map
 
     def _ping_loop(self):
         """Background thread that periodically pings all targets from all interfaces."""
@@ -136,6 +163,7 @@ class TabPing:
             targets = list(self.ping_targets)
             interfaces = list(self.interfaces)
             last_update = self.last_update
+            gateway_map = dict(self.gateway_map)
         
         if not targets:
             # No ping targets configured
@@ -200,6 +228,9 @@ class TabPing:
                 col_x = iface_start_x + col_idx * iface_col_width
                 reachable = results.get(iface, {}).get(target['host'], False)
                 
+                # Check if this target is the gateway for this interface
+                is_gateway = gateway_map.get(iface) == target['host']
+                
                 # Draw indicator dot
                 dot_x = col_x + 15
                 dot_y = y + row_h // 2
@@ -211,7 +242,13 @@ class TabPing:
                     color = styles.ERROR_COLOR
                 
                 try:
-                    pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
+                    if is_gateway:
+                        # Draw gateway with a ring/border style
+                        pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
+                        pygame.draw.circle(surface, color, (dot_x, dot_y), radius + 2, 2)
+                    else:
+                        # Regular filled circle
+                        pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
                 except Exception:
                     pass
         
