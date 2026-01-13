@@ -10,6 +10,8 @@ pings:
     name: User VLAN Gateway
   - host: 8.8.8.8
     name: Google DNS
+  - host: 192.168.100.1
+    name: Home Router 
   update_interval: 10 
   timeout: 2 
 range_scanner:
