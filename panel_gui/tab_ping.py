@@ -243,9 +243,10 @@ class TabPing:
                 
                 try:
                     if is_gateway:
-                        # Draw gateway with a ring/border style
-                        pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
-                        pygame.draw.circle(surface, color, (dot_x, dot_y), radius + 2, 2)
+                        # Draw gateway as a filled rectangle
+                        rect_size = radius * 2
+                        rect = pygame.Rect(dot_x - radius, dot_y - radius, rect_size, rect_size)
+                        pygame.draw.rect(surface, color, rect)
                     else:
                         # Regular filled circle
                         pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
