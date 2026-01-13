@@ -51,7 +51,7 @@ class ActionTab:
                 elapsed = time.time() - getattr(app, 'action_toast_time', 0)
                 if elapsed < 3:  # Show for 3 seconds
                     try:
-                        toast_font = fonts.get('content', fonts.get('tab_title'))
+                        toast_font = fonts.get('small', fonts.get('tab_title'))
                         toast_text = toast_font.render(app.action_toast_message, True, styles.OK_COLOR)
                         toast_rect = toast_text.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
                         surface.blit(toast_text, toast_rect)

@@ -43,15 +43,15 @@ def draw_toast(surface, rect, fonts, message, color=OK_COLOR):
     """Render a toast message using the IP tab's style.
 
     - Semi-transparent dark rounded rectangle (simple rect here)
-    - Centered near the bottom of the provided content rect
+    - Positioned at bottom right of the provided content rect
     - Text in success color by default
     """
     try:
-        toast_font = fonts.get('content', fonts['content'])
+        toast_font = fonts.get('small', fonts['content'])
         toast_text = toast_font.render(message, True, color)
         toast_rect = toast_text.get_rect()
-        toast_x = rect.centerx - toast_rect.width // 2
-        toast_y = rect.bottom - 60
+        toast_x = rect.right - toast_rect.width - 24
+        toast_y = rect.bottom - 40
         bg_rect = pygame.Rect(toast_x - 12, toast_y - 4, toast_rect.width + 24, toast_rect.height + 8)
         # Background with alpha
         toast_surface = pygame.Surface((bg_rect.width, bg_rect.height))
@@ -61,10 +61,11 @@ def draw_toast(surface, rect, fonts, message, color=OK_COLOR):
         # Text
         surface.blit(toast_text, (toast_x, toast_y))
     except Exception:
-        # Fallback: plain text centered at bottom
+        # Fallback: plain text at bottom right
         try:
-            toast_font = fonts.get('content', fonts['content'])
+            toast_font = fonts.get('small', fonts['content'])
             toast_text = toast_font.render(message, True, color)
-            surface.blit(toast_text, toast_text.get_rect(center=(rect.centerx, rect.bottom - 60)))
+            toast_rect = toast_text.get_rect(bottomright=(rect.right - 20, rect.bottom - 10))
+            surface.blit(toast_text, toast_rect)
         except Exception:
             pass
