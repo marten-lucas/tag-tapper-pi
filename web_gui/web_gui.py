@@ -97,17 +97,6 @@ def get_live_ip_state(cfg=None):
         except Exception:
             cfg = {}
 
-    # VLAN name mapping
-    vlan_names = {}
-    for v in cfg.get('vlans', []):
-        try:
-            vid = str(v.get('id'))
-            name = v.get('name') or ''
-            if vid:
-                vlan_names[vid] = name
-        except Exception:
-            pass
-
     def get_all_interfaces():
         try:
             out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
@@ -149,20 +138,10 @@ def get_live_ip_state(cfg=None):
 
     ifaces = get_all_interfaces()
 
-    # Order: eth0, VLANs by id, then wlan*
+    # Order: eth0, then wlan*
     candidates = []
     if 'eth0' in ifaces:
         candidates.append('eth0')
-    vlans = [n for n in ifaces if '.' in n]
-
-    def vlan_key(name):
-        try:
-            return int(name.split('.')[-1])
-        except Exception:
-            return 0
-
-    for n in sorted(vlans, key=vlan_key):
-        candidates.append(n)
     for n in sorted(ifaces):
         if n.startswith('wlan') or n.startswith('wl'):
             if n not in candidates:
@@ -173,11 +152,7 @@ def get_live_ip_state(cfg=None):
         ip = get_ip_for_iface(iface)
         up = iface_is_up(iface)
         display_name = iface
-        if '.' in iface:
-            vid = iface.split('.')[-1]
-            if vid in vlan_names and vlan_names[vid]:
-                display_name = f"{iface} {vlan_names[vid]}"
-        elif iface.startswith('wlan') or iface.startswith('wl'):
+        if iface.startswith('wlan') or iface.startswith('wl'):
             ssid = get_wifi_ssid(iface)
             if ssid:
                 ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
@@ -189,7 +164,7 @@ def get_live_ip_state(cfg=None):
             'up': up,
         })
 
-    return {'interfaces': items, 'vlan_names': vlan_names}
+    return {'interfaces': items}
 
 
 def get_live_ping_state(cfg=None):
@@ -203,12 +178,6 @@ def get_live_ping_state(cfg=None):
     interfaces = []
     if 'eth0' in subprocess.getoutput('ip -o link show'):
         interfaces.append('eth0')
-    for v in cfg.get('vlans', []):
-        try:
-            vid = str(v.get('id'))
-            interfaces.append(f"eth0.{vid}")
-        except Exception:
-            pass
     # Add wlan* interfaces
     try:
         out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')

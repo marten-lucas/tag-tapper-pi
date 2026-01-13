@@ -40,12 +40,8 @@ class TabPing:
             self.update_interval = ping_cfg.get('update_interval', 10)
             self.ping_timeout = ping_cfg.get('timeout', 2)
             
-            # Build interface list: eth0, VLANs, then wlan*
+            # Build interface list: eth0, then wlan*
             interfaces.append('eth0')
-            
-            for v in cfg.get('vlans', []):
-                vid = str(v.get('id'))
-                interfaces.append(f"eth0.{vid}")
             
             # Add wlan interfaces dynamically (like in tab_ip.py)
             try:
@@ -181,8 +177,6 @@ class TabPing:
             # Abbreviate interface names for header
             if iface == 'eth0':
                 iface_abbr = 'eth0'
-            elif iface.startswith('eth0.'):
-                iface_abbr = iface.replace('eth0.', '')
             elif iface.startswith('wlan'):
                 iface_abbr = 'wlan'
             else:

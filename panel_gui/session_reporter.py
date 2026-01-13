@@ -61,24 +61,15 @@ class SessionReporter:
         try:
             with getattr(self.tab_ip, "_lock", threading.Lock()):
                 ifaces = list(getattr(self.tab_ip, "cached_ifaces", []))
-                vlan_names = dict(getattr(self.tab_ip, "cached_vlan_names", {}))
                 ips = dict(getattr(self.tab_ip, "cached_ips", {}))
                 ups = dict(getattr(self.tab_ip, "cached_up", {}))
         except Exception:
-            ifaces, vlan_names, ips, ups = [], {}, {}, {}
+            ifaces, ips, ups = [], {}, {}
 
-        # Order: eth0, VLANs by id, then wlan*
+        # Order: eth0, then wlan*
         candidates = []
         if "eth0" in ifaces:
             candidates.append("eth0")
-        vlans = [n for n in ifaces if "." in n]
-        def vlan_key(name):
-            try:
-                return int(name.split(".")[-1])
-            except Exception:
-                return 0
-        for n in sorted(vlans, key=vlan_key):
-            candidates.append(n)
         for n in sorted(ifaces):
             if n.startswith("wlan") or n.startswith("wl"):
                 if n not in candidates:
@@ -88,11 +79,7 @@ class SessionReporter:
             up = bool(ups.get(iface, False))
             ip = ips.get(iface)
             display_name = iface
-            if "." in iface:
-                vid = iface.split(".")[-1]
-                if vid in vlan_names:
-                    display_name = f"{iface} {vlan_names[vid]}"
-            elif iface.startswith("wlan") or iface.startswith("wl"):
+            if iface.startswith("wlan") or iface.startswith("wl"):
                 # Try SSID for wifi
                 try:
                     ssid = self.tab_ip.get_wifi_ssid(iface)

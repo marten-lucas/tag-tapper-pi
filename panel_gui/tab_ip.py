@@ -69,6 +69,10 @@ class TabIP:
         
         # Detect state changes and generate toast messages
         for iface in ups:
+            # Skip VLAN interfaces (eth0.x) - only show toasts for physical interfaces
+            if '.' in iface:
+                continue
+                
             if iface not in self.prev_up:
                 # New interface detected (first time)
                 self.prev_up[iface] = ups[iface]
