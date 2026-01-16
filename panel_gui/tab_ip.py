@@ -281,8 +281,13 @@ class TabIP:
                     pass
 
         # Current VLAN / gateway info block under the table
-        section_top = start_y + len(candidates) * row_h + 24
-        section_rect = pygame.Rect(name_x - 16, section_top, rect.width - 40, (row_h * 2) + 12)
+        section_top = start_y + len(candidates) * row_h + 32
+        
+        # Use smaller font for info section to prevent overflow
+        info_font = fonts.get('small', fonts.get('content', table_font))
+        info_row_h = info_font.get_height() + 4
+        
+        section_rect = pygame.Rect(name_x - 16, section_top, rect.width - 40, (info_row_h * 2) + 16)
         try:
             pygame.draw.rect(surface, styles.TAB_BG, section_rect)
         except Exception:
@@ -291,7 +296,6 @@ class TabIP:
             except Exception:
                 pass
 
-        info_font = fonts.get('content', table_font)
         label_text = None
         vlan_text = None
         active_iface = None
@@ -307,26 +311,31 @@ class TabIP:
             if active_iface.startswith('wlan') or active_iface.startswith('wl'):
                 ssid = self.get_wifi_ssid(active_iface)
                 if ssid:
-                    ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
+                    # Truncate SSID shorter to fit better
+                    ssid_short = ssid[:12] + '…' if len(ssid) > 12 else ssid
                     iface_label = f"{active_iface} ({ssid_short})"
 
-            label_text = f"Verbunden über: {iface_label}"
+            label_text = f"Verbunden: {iface_label}"
 
             gw_ip = gateways.get(active_iface)
             if gw_ip:
                 gw_name = gateway_labels.get(gw_ip)
                 if gw_name:
-                    vlan_text = f"{gw_name} ({gw_ip})"
+                    # Truncate gateway name if too long
+                    max_name_len = 28
+                    if len(gw_name) > max_name_len:
+                        gw_name = gw_name[:max_name_len] + '…'
+                    vlan_text = f"{gw_name}"
                 else:
-                    vlan_text = f"Gateway unbekannt ({gw_ip})"
+                    vlan_text = f"Gateway: {gw_ip}"
             else:
-                vlan_text = "Gateway unbekannt"
+                vlan_text = None
         else:
-            label_text = "Keine Netzwerkverbindung"
+            label_text = "Keine Verbindung"
             vlan_text = None
 
-        line1_y = section_top + 6
-        line2_y = line1_y + row_h
+        line1_y = section_top + 8
+        line2_y = line1_y + info_row_h + 2
 
         if label_text:
             lbl_surface = info_font.render(label_text, True, styles.TEXT_COLOR)
