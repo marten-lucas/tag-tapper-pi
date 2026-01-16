@@ -359,6 +359,15 @@ def main():
     calib = load_touch_calibration()
     logging.info(f"Calibration: X={calib['raw_x_min']}-{calib['raw_x_max']} Y={calib['raw_y_min']}-{calib['raw_y_max']}")
 
+    # Start Ethernet link monitor to handle VLAN changes
+    eth_monitor = None
+    try:
+        from panel_gui.eth_monitor import EthMonitor
+        eth_monitor = EthMonitor('eth0')
+        logging.info("EthMonitor initialized for eth0")
+    except Exception as e:
+        logging.error(f"Failed to initialize EthMonitor: {e}")
+
     # Start touch monitoring thread (delegated to GUI.touch)
     touch_queue = queue.Queue()
     stop_event = threading.Event()
@@ -536,6 +545,12 @@ def main():
                             elif tabid in ('reboot', 'shutdown'):
                                 # Cleanup before system action
                                 logging.info(f"Performing cleanup before {tabid}")
+                                # stop ethernet monitor
+                                try:
+                                    if eth_monitor:
+                                        eth_monitor.stop()
+                                except Exception:
+                                    pass
                                 # stop touch thread
                                 stop_event.set()
                                 try:
@@ -572,6 +587,11 @@ def main():
     
     finally:
         stop_event.set()
+        try:
+            if eth_monitor:
+                eth_monitor.stop()
+        except Exception:
+            pass
         try:
             t.join(timeout=1)
         except Exception:

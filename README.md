@@ -10,12 +10,26 @@ cd /home/dietpi/tag-tapper-pi
 pip3 install -r requirements.txt
 ```
 
-2. **Start-Skript ausführbar machen:**
+2. **Sudoers-Regel für automatische DHCP-Erneuerung einrichten:**
+
+Damit das System automatisch eine neue IP anfordert, wenn zwischen VLANs gewechselt wird,
+muss die App dhclient ohne Passwort starten können:
+
+```bash
+sudo visudo -f /etc/sudoers.d/tag-tapper-pi
+```
+
+Füge folgende Zeile hinzu:
+```
+root ALL=(ALL) NOPASSWD: /usr/bin/pkill -f dhclient*, /usr/sbin/dhclient
+```
+
+3. **Start-Skript ausführbar machen:**
 ```bash
 chmod +x start.sh
 ```
 
-3. **Manueller Start:**
+4. **Manueller Start:**
 ```bash
 sudo ./start.sh
 ```
