@@ -2,12 +2,16 @@ pings:
   hosts:
   - host: 10.12.12.1
     name: Server VLAN Gateway
+    isgateway: true
   - host: 10.12.99.1
     name: Jail VLAN Gateway
+    isgateway: true
   - host: 172.16.100.1
     name: Infra VLAN Gateway
+    isgateway: true
   - host: 192.168.12.1
     name: User VLAN Gateway
+    isgateway: true
   - host: 8.8.8.8
     name: Google DNS
   - host: 192.168.100.1

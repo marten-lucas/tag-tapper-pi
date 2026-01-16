@@ -3,6 +3,7 @@ import os
 import subprocess
 import threading
 import time
+from config_loader import load_config
 try:
     import pygame
 except Exception:
@@ -15,10 +16,13 @@ class TabIP:
         self.cached_ifaces = []
         self.cached_ips = {}
         self.cached_up = {}
+        self.cached_gateways = {}
         self.poll_interval = 2  # seconds between refreshes
         # Track previous state for change detection
         self.prev_up = {}
         self.prev_ips = {}
+        # Gateway label lookup from config
+        self.gateway_labels = self._load_gateway_labels()
         # Toast message system
         self.toast_message = None
         self.toast_time = 0
@@ -48,10 +52,16 @@ class TabIP:
         # Query interface info in parallel
         ips = {}
         ups = {}
+        gateways = {}
         
         if ifaces:
             def query_interface(iface):
-                return (iface, self.get_ip_for_iface(iface), self.iface_is_up(iface))
+                return (
+                    iface,
+                    self.get_ip_for_iface(iface),
+                    self.iface_is_up(iface),
+                    self.get_gateway_for_iface(iface),
+                )
             
             max_workers = min(10, len(ifaces))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -59,13 +69,15 @@ class TabIP:
                 
                 for future in as_completed(futures):
                     try:
-                        iface, ip, up = future.result()
+                        iface, ip, up, gw = future.result()
                         ips[iface] = ip
                         ups[iface] = up
+                        gateways[iface] = gw
                     except Exception:
                         iface = futures[future]
                         ips[iface] = None
                         ups[iface] = False
+                        gateways[iface] = None
         
         # Detect state changes and generate toast messages
         for iface in ups:
@@ -108,6 +120,24 @@ class TabIP:
             self.cached_ifaces = ifaces
             self.cached_ips = ips
             self.cached_up = ups
+            self.cached_gateways = gateways
+
+    def _load_gateway_labels(self):
+        labels = {}
+        try:
+            cfg = load_config()
+            hosts = cfg.get('pings', {}).get('hosts', [])
+            for h in hosts:
+                try:
+                    if h.get('isgateway'):
+                        ip = str(h.get('host')).strip()
+                        name = h.get('name') or ip
+                        labels[ip] = name
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return labels
     def get_all_interfaces(self):
         out = subprocess.check_output(['ip', '-o', 'link', 'show']).decode('utf-8')
         names = []
@@ -124,6 +154,22 @@ class TabIP:
             if m:
                 return m.group(1)
         except subprocess.CalledProcessError:
+            return None
+        return None
+
+    def get_gateway_for_iface(self, iface):
+        """Return the IPv4 gateway IP for the given interface if a default route exists."""
+        try:
+            out = subprocess.check_output(
+                ['ip', '-4', 'route', 'show', 'dev', iface, 'default'],
+                stderr=subprocess.DEVNULL,
+            ).decode('utf-8')
+            m = re.search(r'default\s+via\s+(\S+)', out)
+            if m:
+                return m.group(1)
+        except subprocess.CalledProcessError:
+            return None
+        except Exception:
             return None
         return None
 
@@ -153,6 +199,8 @@ class TabIP:
             ifaces = list(self.cached_ifaces)
             ips = dict(self.cached_ips)
             ups = dict(self.cached_up)
+            gateways = dict(self.cached_gateways)
+            gateway_labels = dict(self.gateway_labels)
 
         # Build ordered candidate list: eth0, then wlan*
         candidates = []
@@ -231,6 +279,58 @@ class TabIP:
                     pygame.draw.line(surface, color, (cx - s, cy + s), (cx + s, cy - s), 2)
                 except Exception:
                     pass
+
+        # Current VLAN / gateway info block under the table
+        section_top = start_y + len(candidates) * row_h + 24
+        section_rect = pygame.Rect(name_x - 16, section_top, rect.width - 40, row_h + 12)
+        try:
+            pygame.draw.rect(surface, styles.TAB_BG, section_rect)
+        except Exception:
+            try:
+                pygame.draw.rect(surface, styles.NEUTRAL_RING, section_rect)
+            except Exception:
+                pass
+
+        info_font = fonts.get('content', table_font)
+        label_text = None
+        vlan_text = None
+        active_iface = None
+
+        for iface in candidates:
+            if ups.get(iface) and ips.get(iface):
+                active_iface = iface
+                break
+
+        if active_iface:
+            # Build interface label (with SSID if wifi)
+            iface_label = active_iface
+            if active_iface.startswith('wlan') or active_iface.startswith('wl'):
+                ssid = self.get_wifi_ssid(active_iface)
+                if ssid:
+                    ssid_short = ssid[:16] + '…' if len(ssid) > 16 else ssid
+                    iface_label = f"{active_iface} ({ssid_short})"
+
+            label_text = f"Verbunden über: {iface_label}"
+
+            gw_ip = gateways.get(active_iface)
+            if gw_ip:
+                gw_name = gateway_labels.get(gw_ip)
+                if gw_name:
+                    vlan_text = f"{gw_name} ({gw_ip})"
+                else:
+                    vlan_text = f"Gateway unbekannt ({gw_ip})"
+            else:
+                vlan_text = "Gateway unbekannt"
+        else:
+            label_text = "Keine Netzwerkverbindung"
+            vlan_text = None
+
+        if label_text:
+            lbl_surface = info_font.render(label_text, True, styles.TEXT_COLOR)
+            surface.blit(lbl_surface, (name_x, section_top + 6))
+        if vlan_text:
+            vlan_surface = info_font.render(vlan_text, True, styles.ACCENT_COLOR)
+            surface.blit(vlan_surface, (ip_x, section_top + 6))
 
         # Render toast message if active
         if self.toast_message:
