@@ -158,7 +158,12 @@ class TabIP:
         return None
 
     def get_gateway_for_iface(self, iface):
-        """Return the IPv4 gateway IP for the given interface if a default route exists."""
+        """Return the IPv4 gateway IP for the given interface.
+        
+        First tries to find a default route via this interface.
+        If no default route exists, derives gateway from the network (assumes .1).
+        """
+        # Try to find default route for this interface
         try:
             out = subprocess.check_output(
                 ['ip', '-4', 'route', 'show', 'dev', iface, 'default'],
@@ -167,10 +172,28 @@ class TabIP:
             m = re.search(r'default\s+via\s+(\S+)', out)
             if m:
                 return m.group(1)
-        except subprocess.CalledProcessError:
-            return None
         except Exception:
-            return None
+            pass
+        
+        # No default route - derive gateway from IP network
+        # Get the IP address and calculate typical gateway (.1)
+        try:
+            ip_with_prefix = self.get_ip_for_iface(iface)
+            if ip_with_prefix:
+                # Parse IP/prefix (e.g., "192.168.12.128/24")
+                if '/' in ip_with_prefix:
+                    ip_str = ip_with_prefix.split('/')[0]
+                else:
+                    ip_str = ip_with_prefix
+                
+                # Calculate gateway as first usable IP (.1)
+                parts = ip_str.split('.')
+                if len(parts) == 4:
+                    gateway = f"{parts[0]}.{parts[1]}.{parts[2]}.1"
+                    return gateway
+        except Exception:
+            pass
+        
         return None
 
     def iface_is_up(self, iface):
