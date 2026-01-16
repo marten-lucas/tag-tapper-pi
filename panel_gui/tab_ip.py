@@ -282,7 +282,7 @@ class TabIP:
 
         # Current VLAN / gateway info block under the table
         section_top = start_y + len(candidates) * row_h + 24
-        section_rect = pygame.Rect(name_x - 16, section_top, rect.width - 40, row_h + 12)
+        section_rect = pygame.Rect(name_x - 16, section_top, rect.width - 40, (row_h * 2) + 12)
         try:
             pygame.draw.rect(surface, styles.TAB_BG, section_rect)
         except Exception:
@@ -325,12 +325,15 @@ class TabIP:
             label_text = "Keine Netzwerkverbindung"
             vlan_text = None
 
+        line1_y = section_top + 6
+        line2_y = line1_y + row_h
+
         if label_text:
             lbl_surface = info_font.render(label_text, True, styles.TEXT_COLOR)
-            surface.blit(lbl_surface, (name_x, section_top + 6))
+            surface.blit(lbl_surface, (name_x, line1_y))
         if vlan_text:
             vlan_surface = info_font.render(vlan_text, True, styles.ACCENT_COLOR)
-            surface.blit(vlan_surface, (ip_x, section_top + 6))
+            surface.blit(vlan_surface, (name_x, line2_y))
 
         # Render toast message if active
         if self.toast_message:
