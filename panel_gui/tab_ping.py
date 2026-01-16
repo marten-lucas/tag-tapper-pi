@@ -12,7 +12,7 @@ from config_loader import load_config
 class TabPing:
     def __init__(self):
         self._lock = threading.Lock()
-        self.ping_results = {}  # {(interface, host): bool}
+        self.ping_results = {}  # {(interface, host): 'ok'|'failed'|'not_routable'}
         self.last_update = None
         self.interfaces = []
         self.ping_targets = []
@@ -112,7 +112,7 @@ class TabPing:
                     if self._interface_exists(iface):
                         ping_tasks.append((iface, target['host']))
                     else:
-                        results.setdefault(iface, {})[target['host']] = False
+                        results.setdefault(iface, {})[target['host']] = 'not_routable'
             
             # Execute pings in parallel
             if ping_tasks:
@@ -123,8 +123,8 @@ class TabPing:
                     
                     for future in as_completed(futures):
                         iface, host = futures[future]
-                        reachable = future.result()
-                        results.setdefault(iface, {})[host] = reachable
+                        state = future.result()
+                        results.setdefault(iface, {})[host] = state
             
             # Update cache
             with self._lock:
@@ -144,7 +144,16 @@ class TabPing:
             return False
 
     def _ping(self, interface, host):
-        """Ping a host from a specific interface with timeout."""
+        """Ping a host from a specific interface with timeout.
+        
+        Returns:
+            'ok': Ping successful
+            'failed': Ping failed but host is in same subnet (e.g., gateway blocks ICMP)
+            'not_routable': Host not in same subnet and no default route
+        """
+        # Check if host is in same subnet
+        in_subnet = self._is_in_same_subnet(interface, host)
+        
         try:
             result = subprocess.run(
                 ['ping', '-I', interface, '-c', '1', '-W', str(self.ping_timeout), host],
@@ -152,8 +161,48 @@ class TabPing:
                 stderr=subprocess.DEVNULL,
                 timeout=self.ping_timeout + 1
             )
-            return result.returncode == 0
+            if result.returncode == 0:
+                return 'ok'
+            else:
+                # Ping failed - distinguish based on subnet
+                return 'failed' if in_subnet else 'not_routable'
         except (subprocess.TimeoutExpired, Exception):
+            return 'failed' if in_subnet else 'not_routable'
+    
+    def _is_in_same_subnet(self, interface, host):
+        """Check if host is in the same subnet as the interface."""
+        try:
+            import re
+            out = subprocess.check_output(
+                ['ip', '-o', '-4', 'addr', 'show', 'dev', interface],
+                stderr=subprocess.DEVNULL
+            ).decode('utf-8')
+            
+            m = re.search(r'inet\s+(\S+)', out)
+            if not m:
+                return False
+            
+            ip_with_prefix = m.group(1)
+            if '/' not in ip_with_prefix:
+                return False
+            
+            ip_str, prefix_len = ip_with_prefix.split('/')
+            prefix_len = int(prefix_len)
+            
+            # Convert IPs to integers
+            def ip_to_int(ip):
+                parts = list(map(int, ip.split('.')))
+                return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3]
+            
+            iface_ip_int = ip_to_int(ip_str)
+            host_ip_int = ip_to_int(host)
+            
+            # Calculate network mask
+            mask = (0xFFFFFFFF << (32 - prefix_len)) & 0xFFFFFFFF
+            
+            # Check if in same subnet
+            return (iface_ip_int & mask) == (host_ip_int & mask)
+        except Exception:
             return False
 
     def draw(self, surface, rect, app, styles, fonts):
@@ -226,7 +275,7 @@ class TabPing:
             # Ping results for each interface
             for col_idx, iface in enumerate(interfaces):
                 col_x = iface_start_x + col_idx * iface_col_width
-                reachable = results.get(iface, {}).get(target['host'], False)
+                state = results.get(iface, {}).get(target['host'], 'not_routable')
                 
                 # Check if this target is the gateway for this interface
                 is_gateway = gateway_map.get(iface) == target['host']
@@ -236,20 +285,32 @@ class TabPing:
                 dot_y = y + row_h // 2
                 radius = row_h // 4
                 
-                if reachable:
+                # Determine color and shape based on state
+                if state == 'ok':
                     color = styles.OK_COLOR
-                else:
+                    shape = 'circle'
+                elif state == 'failed':
+                    # Gateway in same subnet but not responding to ICMP
                     color = styles.ERROR_COLOR
+                    shape = 'square'
+                else:  # 'not_routable'
+                    color = styles.ERROR_COLOR
+                    shape = 'x'
                 
                 try:
-                    if is_gateway:
-                        # Draw gateway as a filled rectangle
+                    if shape == 'square':
+                        # Red square for gateway that doesn't respond
                         rect_size = radius * 2
-                        rect = pygame.Rect(dot_x - radius, dot_y - radius, rect_size, rect_size)
-                        pygame.draw.rect(surface, color, rect)
-                    else:
-                        # Regular filled circle
+                        rect_obj = pygame.Rect(dot_x - radius, dot_y - radius, rect_size, rect_size)
+                        pygame.draw.rect(surface, color, rect_obj)
+                    elif shape == 'circle':
+                        # Green circle for reachable
                         pygame.draw.circle(surface, color, (dot_x, dot_y), radius)
+                    else:  # shape == 'x'
+                        # Red X for not routable
+                        s = radius
+                        pygame.draw.line(surface, color, (dot_x - s, dot_y - s), (dot_x + s, dot_y + s), 2)
+                        pygame.draw.line(surface, color, (dot_x - s, dot_y + s), (dot_x + s, dot_y - s), 2)
                 except Exception:
                     pass
         
