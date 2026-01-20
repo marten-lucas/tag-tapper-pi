@@ -215,13 +215,14 @@ class TabPing:
             gateway_map = dict(self.gateway_map)
         
         if not targets:
-            # No ping targets configured
-            msg = fonts['content'].render("Keine Ping-Ziele konfiguriert", True, styles.MUTED_TEXT)
+            # No ping targets configured (use smaller font)
+            msg_font = fonts.get('small', fonts.get('content'))
+            msg = msg_font.render("Keine Ping-Ziele konfiguriert", True, styles.MUTED_TEXT)
             surface.blit(msg, msg.get_rect(center=(rect.centerx, rect.centery)))
             return
         
-        # Use smaller font for table
-        table_font = fonts.get('tab_title', fonts['content'])
+        # Use a more compact font for the table on the Ping tab
+        table_font = fonts.get('small', fonts.get('tab_title', fonts.get('content')))
         row_h = table_font.get_height() + 6
         
         # Calculate column widths dynamically to fit all interfaces on screen
