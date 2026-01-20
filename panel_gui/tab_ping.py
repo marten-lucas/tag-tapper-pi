@@ -221,9 +221,13 @@ class TabPing:
             surface.blit(msg, msg.get_rect(center=(rect.centerx, rect.centery)))
             return
         
-        # Use a more compact font for the table on the Ping tab
-        table_font = fonts.get('small', fonts.get('tab_title', fonts.get('content')))
-        row_h = table_font.get_height() + 6
+        # Use a compact fixed-size font for the table on the Ping tab
+        try:
+            table_font = pygame.font.Font(None, 18)
+        except Exception:
+            table_font = fonts.get('small', fonts.get('tab_title', fonts.get('content')))
+        # Reduce row height padding to fit more rows on screen
+        row_h = table_font.get_height() + 2
         
         # Calculate column widths dynamically to fit all interfaces on screen
         name_col_width = 190
