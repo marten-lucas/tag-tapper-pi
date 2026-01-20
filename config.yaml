@@ -12,10 +12,21 @@ pings:
   - host: 192.168.12.1
     name: User VLAN Gateway
     isgateway: true
+  - host: 192.168.12.1
+    name: App Server
+    isgateway: true
   - host: 8.8.8.8
     name: Google DNS
-  - host: 192.168.100.1
-    name: Home Router 
+  - host: 10.12.12.20
+    name: printer-kiga-gramschatz
+  - host: 10.12.12.30
+    name: voip-kiga-gramschatz
+  - host: 10.12.12.10
+    name: appserver-kiga-gramschatz
+  - host: 10.12.12.11
+    name: backup-kiga-gramschatz
+  - host: 172.16.100.100
+    name: openwisp-kiga-gramschatz
   update_interval: 10 
   timeout: 2 
 range_scanner:
